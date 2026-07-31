@@ -1,0 +1,70 @@
+import type { FieldClassification } from "../entities/field-classification";
+import type { Run } from "../entities/run";
+import type { LogLevel } from "../value-objects/log-level";
+import type { RunKind } from "../value-objects/run-kind";
+import type { RunStatus } from "../value-objects/run-status";
+import type { ScreenshotStage } from "../value-objects/screenshot-stage";
+
+export type RunUpdatablePatch = Partial<
+  Pick<
+    Run,
+    "contactPageUrl" | "formSelector" | "windowLabel" | "errorStep" | "errorMessage" | "startedAt" | "finishedAt"
+  >
+>;
+
+export interface ScreenshotRecord {
+  id: string;
+  stage: ScreenshotStage;
+  filePath: string;
+  createdAt: Date;
+}
+
+export interface RunLogRecord {
+  id: string;
+  level: LogLevel;
+  step: string;
+  message: string;
+  metadata: Record<string, unknown> | null;
+  createdAt: Date;
+}
+
+export interface RunDetail extends Run {
+  screenshots: readonly ScreenshotRecord[];
+  logs: readonly RunLogRecord[];
+}
+
+export interface ActiveRunSummary extends Run {
+  targetUrl: string;
+  targetCompanyName: string | null;
+}
+
+export interface RunExportRow extends Run {
+  targetUrl: string;
+  targetCompanyName: string | null;
+  screenshotPaths: readonly string[];
+}
+
+export interface RunRepository {
+  create(targetId: string, kind: RunKind): Promise<Run>;
+  updateStatus(runId: string, status: RunStatus, patch?: RunUpdatablePatch): Promise<void>;
+  appendLog(
+    runId: string,
+    level: LogLevel,
+    step: string,
+    message: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<void>;
+  addScreenshot(runId: string, stage: ScreenshotStage, filePath: string): Promise<void>;
+  addFieldClassifications(runId: string, classifications: readonly FieldClassification[]): Promise<void>;
+  findById(runId: string): Promise<Run | null>;
+  findDetailById(runId: string): Promise<RunDetail | null>;
+  listByTarget(targetId: string): Promise<readonly Run[]>;
+  /**
+   * 実行中、または「送信待ち」等ブラウザが開いたままになっている可能性のあるRunを一覧する。
+   * kindでEXPLORE（可視タブなし）/FILL（可視タブあり）を絞り込める。
+   */
+  listActive(filter?: { profileId?: string; kind?: RunKind }): Promise<readonly ActiveRunSummary[]>;
+  /** CSVエクスポート用にRunを新しい順で一覧する。profileIdで対象プロジェクトに絞り込み、
+   *  failedOnlyで送信不可・失敗・ブロック済みのみに絞り込める（「送信失敗一覧CSV」用）。 */
+  listForExport(filter?: { profileId?: string; failedOnly?: boolean }): Promise<readonly RunExportRow[]>;
+}

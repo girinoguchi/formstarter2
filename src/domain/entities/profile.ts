@@ -1,0 +1,29 @@
+export interface Profile {
+  id: string;
+  name: string;
+  isActive: boolean;
+  companyName: string;
+  companyNameKana: string;
+  lastName: string;
+  firstName: string;
+  fullName: string;
+  lastNameKana: string;
+  firstNameKana: string;
+  furigana: string;
+  department: string;
+  jobTitle: string;
+  industry: string;
+  employeeCount: string;
+  email: string;
+  phone1: string;
+  phone2: string;
+  phone3: string;
+  postalCode: string;
+  address: string;
+  websiteUrl: string;
+  inquiryType: string;
+  inquiryBody: string;
+  consentPolicy: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
