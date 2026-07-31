@@ -1,0 +1,213 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum TargetStatus {
+  PENDING
+  QUEUED
+  RUNNING
+  READY
+  AWAITING_SEND
+  NEEDS_REVIEW
+  BLOCKED
+  NOT_SENDABLE
+  FAILED
+}
+
+enum RunStatus {
+  PENDING
+  LAUNCHING_BROWSER
+  LOADING_SITE
+  FINDING_CONTACT_PAGE
+  PARSING_FORM
+  CLASSIFYING_FIELDS
+  FILLING_FORM
+  HANDLING_VALIDATION
+  REACHED_CONFIRMATION
+  READY
+  AWAITING_SEND
+  NEEDS_REVIEW
+  BLOCKED
+  NOT_SENDABLE
+  FAILED
+}
+
+enum RunKind {
+  EXPLORE
+  FILL
+}
+
+enum ScreenshotStage {
+  TOP_PAGE
+  CONTACT_PAGE
+  AFTER_FILL
+  CONFIRMATION_PAGE
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+enum FieldCategory {
+  COMPANY_NAME
+  CONTACT_PERSON
+  FULL_NAME
+  FURIGANA
+  EMAIL
+  PHONE
+  ADDRESS
+  POSTAL_CODE
+  URL
+  INQUIRY_TYPE
+  INQUIRY_BODY
+  CONSENT_CHECKBOX
+  UNKNOWN
+}
+
+enum ClassificationSource {
+  RULE
+  LLM
+  CACHE
+}
+
+model ImportBatch {
+  id         String   @id @default(cuid())
+  fileName   String
+  importedAt DateTime @default(now())
+  targets    Target[]
+}
+
+model Target {
+  id             String       @id @default(cuid())
+  url            String
+  companyName    String?
+  status         TargetStatus @default(PENDING)
+  contactPageUrl String?
+  importBatchId  String?
+  importBatch    ImportBatch? @relation(fields: [importBatchId], references: [id])
+  // FormStarterappの「プロジェクトごとのURL一覧」に合わせ、Targetは必ずProfileに紐付く。
+  // プロジェクト（Profile）を削除すると、そのURL一覧・実行履歴も一緒に削除される。
+  profileId      String
+  profile        Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  runs           Run[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+
+  @@index([status])
+  @@index([profileId])
+}
+
+model Run {
+  id                   String                    @id @default(cuid())
+  targetId             String
+  target               Target                    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  // EXPLORE: 可視タブを開かず「送信可能か」だけ確認するRun。FILL: 確認済みの
+  // 問い合わせページに実際に入力していく、可視タブを伴うRun。
+  kind                 RunKind                   @default(FILL)
+  status               RunStatus                 @default(PENDING)
+  contactPageUrl       String?
+  formSelector         String?
+  windowLabel          String?
+  errorStep            String?
+  errorMessage          String?
+  startedAt            DateTime?
+  finishedAt           DateTime?
+  screenshots          Screenshot[]
+  logs                 RunLog[]
+  fieldClassifications RunFieldClassification[]
+  createdAt            DateTime                  @default(now())
+
+  @@index([targetId])
+  @@index([status])
+}
+
+model Screenshot {
+  id        String          @id @default(cuid())
+  runId     String
+  run       Run             @relation(fields: [runId], references: [id], onDelete: Cascade)
+  stage     ScreenshotStage
+  filePath  String
+  createdAt DateTime        @default(now())
+
+  @@index([runId])
+}
+
+model RunLog {
+  id        String   @id @default(cuid())
+  runId     String
+  run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  level     LogLevel @default(INFO)
+  step      String
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([runId])
+}
+
+model FieldMappingCache {
+  id                String   @id @default(cuid())
+  hostKey           String
+  formSignatureHash String
+  mapping           Json
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([hostKey, formSignatureHash])
+}
+
+model RunFieldClassification {
+  id            String               @id @default(cuid())
+  runId         String
+  run           Run                  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  fieldSelector String
+  fieldLabel    String?
+  category      FieldCategory
+  source        ClassificationSource
+  confidence    Float?
+  filledValue   String?
+  createdAt     DateTime             @default(now())
+
+  @@index([runId])
+}
+
+// FormStarterapp（/dashboard の Profile）と同じフィールド構成・プロジェクト切替の仕組みに揃えている。
+// 複数のProfileを名前付きで保持し、isActiveなものが自動入力・編集画面の対象になる。
+model Profile {
+  id              String   @id @default(cuid())
+  name            String   @default("default")
+  isActive        Boolean  @default(false)
+  companyName     String   @default("")
+  companyNameKana String   @default("")
+  lastName        String   @default("")
+  firstName       String   @default("")
+  fullName        String   @default("")
+  lastNameKana    String   @default("")
+  firstNameKana   String   @default("")
+  furigana        String   @default("")
+  department      String   @default("")
+  jobTitle        String   @default("")
+  industry        String   @default("")
+  employeeCount   String   @default("")
+  email           String   @default("")
+  phone1          String   @default("")
+  phone2          String   @default("")
+  phone3          String   @default("")
+  postalCode      String   @default("")
+  address         String   @default("")
+  websiteUrl      String   @default("")
+  inquiryType     String   @default("")
+  inquiryBody     String   @default("")
+  consentPolicy   Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  targets         Target[]
+}
