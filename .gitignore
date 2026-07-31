@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 実行時に生成されるスクリーンショット・ログ（実サイトの画面・入力内容を含むため追跡しない）
+/public/logs/
