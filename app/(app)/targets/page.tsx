@@ -8,6 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { TARGET_STATUSES, type TargetStatus } from "../../../src/domain/value-objects/run-status";
@@ -23,6 +31,7 @@ import { useAuth } from "../../../src/ui/providers/auth-provider";
 
 const ALL_STATUSES_VALUE = "ALL";
 const FAILED_LIKE_STATUSES = new Set(["FAILED", "NOT_SENDABLE", "BLOCKED"]);
+const PAGE_SIZE = 50;
 
 export default function TargetsPage() {
   const { isAdmin } = useAuth();
@@ -44,6 +53,17 @@ export default function TargetsPage() {
     search: search || undefined,
     status: statusFilter || undefined,
   });
+
+  const [page, setPage] = useState(1);
+  const filterKey = `${profileId ?? ""}:${search}:${statusFilter}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+  const totalPages = targets ? Math.max(1, Math.ceil(targets.length / PAGE_SIZE)) : 1;
+  const currentPage = Math.min(page, totalPages);
+  const pagedTargets = targets?.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const [newUrl, setNewUrl] = useState("");
   const [importMessage, setImportMessage] = useState<string | null>(null);
@@ -278,7 +298,49 @@ export default function TargetsPage() {
 
       {isLoading && <p className="text-sm text-muted-foreground">読み込み中...</p>}
       {isError && <p className="text-sm text-destructive">一覧の取得に失敗しました</p>}
-      {targets && <TargetTable targets={targets} />}
+      {pagedTargets && <TargetTable targets={pagedTargets} />}
+
+      {targets && targets.length > PAGE_SIZE && (
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            {targets.length}件中 {(currentPage - 1) * PAGE_SIZE + 1}〜
+            {Math.min(currentPage * PAGE_SIZE, targets.length)}件を表示
+          </p>
+          <Pagination className="mx-0 w-auto">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  text="前へ"
+                  aria-disabled={currentPage === 1}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPage((p) => Math.max(1, p - 1));
+                  }}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationLink href="#" isActive size="default" className="pointer-events-none">
+                  {currentPage} / {totalPages}
+                </PaginationLink>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  text="次へ"
+                  aria-disabled={currentPage === totalPages}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : undefined}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPage((p) => Math.min(totalPages, p + 1));
+                  }}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   );
 }
