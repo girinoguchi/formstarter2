@@ -2,6 +2,7 @@ import * as cheerio from "cheerio";
 
 import type { ContactPageFinder, ContactPageFinderResult } from "../../domain/ports/contact-page-finder.port";
 import { CONTACT_LINK_KEYWORDS } from "../../config/constants";
+import { isSameSite } from "./same-site";
 
 type Landmark = "header" | "nav" | "footer" | "other";
 
@@ -57,7 +58,11 @@ export class HttpContactPageFinder implements ContactPageFinder {
       if (best && score <= best.score) return;
 
       try {
-        best = { url: new URL(href, siteUrl).toString(), score };
+        const resolved = new URL(href, siteUrl).toString();
+        // 別ドメインのリンク(SNSプラットフォームの定型ヘルプページ等)を
+        // 実際の問い合わせページと誤認しないよう、同一サイトの候補のみ受け付ける。
+        if (!isSameSite(resolved, siteUrl)) return;
+        best = { url: resolved, score };
       } catch {
         // 不正なURLは無視
       }

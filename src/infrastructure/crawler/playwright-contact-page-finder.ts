@@ -27,6 +27,25 @@ export class PlaywrightContactPageFinder implements ContactPageFinder {
         return 0.6;
       }
 
+      // 別ドメインのリンク(SNSプラットフォームの定型ヘルプページ等)を実際の
+      // 問い合わせページと誤認しないよう、同一サイトの候補のみ受け付ける
+      // (自社サイトを持たずSNSプロフィールを登録しているターゲットで、Metaの
+      // "Contact Uploading & Non-Users"のようなfacebook.com/help配下の定型リンクが
+      // 「contact」に一致し誤ってREADYになる実バグがあった)。
+      function isSameSite(candidateHref: string): boolean {
+        try {
+          const candidateHost = new URL(candidateHref).hostname.replace(/^www\./, "");
+          const siteHost = location.hostname.replace(/^www\./, "");
+          return (
+            candidateHost === siteHost ||
+            candidateHost.endsWith(`.${siteHost}`) ||
+            siteHost.endsWith(`.${candidateHost}`)
+          );
+        } catch {
+          return false;
+        }
+      }
+
       let best: EvaluateResult | null = null;
       const anchors = Array.from(document.querySelectorAll("a[href]"));
 
@@ -40,10 +59,13 @@ export class PlaywrightContactPageFinder implements ContactPageFinder {
         const text = anchor.textContent ?? "";
         if (!matchesKeyword(text) && !matchesKeyword(href)) continue;
 
+        const resolvedHref = (anchor as HTMLAnchorElement).href;
+        if (!isSameSite(resolvedHref)) continue;
+
         const score = landmarkScore(anchor);
         if (best && score <= best.score) continue;
 
-        best = { href: (anchor as HTMLAnchorElement).href, score };
+        best = { href: resolvedHref, score };
       }
 
       return best;
