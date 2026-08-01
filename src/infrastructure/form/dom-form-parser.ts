@@ -77,6 +77,17 @@ function extractFormsInCurrentDocument(): ExtractedForm[] {
       if (parts.length > 0) return parts.join(" ");
     }
 
+    // 昔ながらのtable/dlレイアウト（<tr><td>お名前</td><td><input></td></tr>や
+    // <dt>お名前</dt><dd><input></dd>）では、ラベルはinput自身の兄弟ではなく
+    // 「inputの親要素」の直前の兄弟（前のtd/dt等）に書かれている。<label>タグも
+    // aria属性も無いため、これが無いとお名前・メール等の基本項目まで
+    // UNKNOWNになってしまう実バグがあった（oh-ami.com等の実データで確認）。
+    const parentPrevSibling = el.parentElement?.previousElementSibling;
+    const siblingText = parentPrevSibling?.textContent?.trim();
+    if (siblingText && !parentPrevSibling?.querySelector("input, select, textarea")) {
+      return siblingText.slice(0, 200);
+    }
+
     // 同意チェックボックスなど、<label>で明示的に紐付けられていないケース
     // （例: <div><input type=checkbox><span>利用規約に同意する<a>詳細</a></span></div>）
     // への最後の手段として、親要素のテキストから他のフォーム部品を除いたものを使う。
