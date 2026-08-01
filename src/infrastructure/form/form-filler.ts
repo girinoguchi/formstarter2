@@ -73,6 +73,17 @@ function resolveProfileValue(category: FieldCategory, profile: Profile): string 
   }
 }
 
+/**
+ * 「その他」的な選択肢も無いカテゴリ選択(kurashi-no-techo.co.jp等、雑誌の投稿種別
+ * のように自社サイト固有の選択肢しか無く「その他」が存在しないケースがある)では、
+ * プレースホルダ(value=""の「選択してください」等)を除いた最初の実在する選択肢を選ぶ。
+ * 未選択のまま(プレースホルダのまま)にしておくより、何かしら選んで条件付き非表示の
+ * 項目を出現させたほうが送信可能な状態に近づける。
+ */
+function firstRealOption(options: readonly FormFieldOption[]): FormFieldOption | undefined {
+  return options.find((o) => o.value.trim() !== "");
+}
+
 function findBestOption(options: readonly FormFieldOption[], target: string): FormFieldOption | null {
   const normalizedTarget = normalize(target);
   const exact = options.find(
@@ -195,7 +206,9 @@ export class PlaywrightFormFiller implements FormFiller {
     if (field.type === "select" && field.options) {
       const option =
         findBestOption(field.options, value) ??
-        (category === "INQUIRY_TYPE" ? field.options.find((o) => OTHER_OPTION_PATTERN.test(o.label)) : undefined);
+        (category === "INQUIRY_TYPE"
+          ? (field.options.find((o) => OTHER_OPTION_PATTERN.test(o.label)) ?? firstRealOption(field.options))
+          : undefined);
       if (option) {
         await session.selectOption(field.selector, option.value, { timeoutMs: FIELD_FILL_TIMEOUT_MS, frameUrl });
       }

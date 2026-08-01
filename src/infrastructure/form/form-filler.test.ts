@@ -145,4 +145,26 @@ describe("PlaywrightFormFiller conditional-category forms", () => {
     // "とある新規開拓のご案内"はどの選択肢にも一致しないため、「その他」が選ばれる。
     expect(session.calls).toContain("select:#category=3");
   });
+
+  it("falls back to the first real option when there is no 'その他' choice either", async () => {
+    // kurashi-no-techo.co.jpの投稿種別選択のように、サイト固有の選択肢しか無く
+    // 「その他」自体が存在しないケース。プレースホルダ(空欄)を除いた最初の選択肢を選ぶ。
+    const categoryField = field({
+      selector: "#category",
+      type: "select",
+      options: [
+        { value: "", label: "選択してください" },
+        { value: "reader", label: "読者の手帖" },
+        { value: "apron", label: "エプロンメモ" },
+      ],
+    });
+    const classifications: FieldClassification[] = [
+      { fieldSelector: "#category", fieldLabel: "ご用件", category: "INQUIRY_TYPE", source: "RULE", confidence: 0.8 },
+    ];
+
+    const session = new FakeSession();
+    await new PlaywrightFormFiller().fill(session, [categoryField], classifications, PROFILE);
+
+    expect(session.calls).toContain("select:#category=reader");
+  });
 });
