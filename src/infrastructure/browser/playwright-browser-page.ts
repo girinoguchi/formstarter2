@@ -9,8 +9,9 @@ export class PlaywrightBrowserPage implements BrowserSession {
     return this.page.url();
   }
 
-  async goto(url: string, options?: { timeoutMs?: number }): Promise<void> {
-    await this.page.goto(url, { waitUntil: "domcontentloaded", timeout: options?.timeoutMs });
+  async goto(url: string, options?: { timeoutMs?: number }): Promise<{ status: number | null }> {
+    const response = await this.page.goto(url, { waitUntil: "domcontentloaded", timeout: options?.timeoutMs });
+    return { status: response?.status() ?? null };
   }
 
   async content(): Promise<string> {

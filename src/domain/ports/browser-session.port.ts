@@ -9,7 +9,8 @@
 export interface BrowserSession {
   readonly currentUrl: string;
 
-  goto(url: string, options?: { timeoutMs?: number }): Promise<void>;
+  /** statusはBot対策(Cloudflare等)の検知に使う。ナビゲーションがリダイレクトのみ等でレスポンスを伴わない場合はnull。 */
+  goto(url: string, options?: { timeoutMs?: number }): Promise<{ status: number | null }>;
   content(): Promise<string>;
   evaluate<T, Arg = undefined>(fn: (arg: Arg) => T, arg?: Arg, options?: { frameUrl?: string }): Promise<T>;
   /** 同一ページ内の子フレーム（iframe）のURL一覧。クロスオリジンiframe内フォームの探索に使う。 */

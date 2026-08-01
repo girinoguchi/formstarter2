@@ -7,6 +7,7 @@ import {
   HeadlessPlaywrightSessionManager,
   PlaywrightSessionManager,
 } from "../infrastructure/browser/playwright-session-manager";
+import { HeuristicBlockDetector } from "../infrastructure/crawler/block-detector";
 import { HttpContactPageFinder } from "../infrastructure/crawler/http-contact-page-finder";
 import { PlaywrightContactPageFinder } from "../infrastructure/crawler/playwright-contact-page-finder";
 import { StaticFormChecker } from "../infrastructure/crawler/static-form-checker";
@@ -43,6 +44,7 @@ const formFiller = new PlaywrightFormFiller();
 const validationErrorParser = new DomValidationErrorParser();
 const confirmationPageDetector = new HeuristicConfirmationPageDetector();
 const sentPageDetector = new HeuristicSentPageDetector();
+const blockDetector = new HeuristicBlockDetector();
 const runOrchestrator = new RunOrchestrator(
   headedSessionFactory,
   headlessSessionFactory,
@@ -59,6 +61,7 @@ const runOrchestrator = new RunOrchestrator(
   validationErrorParser,
   confirmationPageDetector,
   sentPageDetector,
+  blockDetector,
 );
 // FILL（可視タブでの入力）は一覧の行ボタンから1件ずつ手動で開始する方式のため、
 // 自動でキューへ投入するプールは持たない（勝手にタブが増えていく体験を避けるため）。

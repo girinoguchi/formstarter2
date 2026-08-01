@@ -5,6 +5,7 @@ import type { ParsedForm, ParsedFormField } from "../domain/entities/form-field"
 import type { Profile } from "../domain/entities/profile";
 import type { Run } from "../domain/entities/run";
 import type { Target } from "../domain/entities/target";
+import type { BlockDetector } from "../domain/ports/block-detector.port";
 import type { BrowserSession } from "../domain/ports/browser-session.port";
 import type { BrowserSessionFactory } from "../domain/ports/browser-session-factory.port";
 import type { ConfirmationPageDetector } from "../domain/ports/confirmation-page-detector.port";
@@ -74,7 +75,17 @@ export class RunOrchestrator {
     private readonly validationErrorParser: ValidationErrorParser,
     private readonly confirmationPageDetector: ConfirmationPageDetector,
     private readonly sentPageDetector: SentPageDetector,
+    private readonly blockDetector: BlockDetector,
   ) {}
+
+  /** ナビゲーション直後にCloudflare等のBot対策で拒否/チャレンジされていないか確認する。 */
+  private async checkBlocked(session: BrowserSession, status: number | null): Promise<boolean> {
+    const { title, bodyText } = await session.evaluate(() => ({
+      title: document.title,
+      bodyText: document.body?.innerText?.slice(0, 2000) ?? "",
+    }));
+    return this.blockDetector.isBlocked({ status, title, bodyText });
+  }
 
   /** CSVインポート後のExplorePool用/UIの「探索」用: Run行の作成まで待ち、あとはバックグラウンドで継続する。 */
   async explore(targetId: string): Promise<Run> {
@@ -196,8 +207,24 @@ export class RunOrchestrator {
 
     try {
       await this.runRepository.updateStatus(run.id, "LOADING_SITE", { contactPageUrl });
-      await acquired.session.goto(contactPageUrl, { timeoutMs: NAV_TIMEOUT_MS });
+      const { status } = await acquired.session.goto(contactPageUrl, { timeoutMs: NAV_TIMEOUT_MS });
       await this.runRepository.appendLog(run.id, "INFO", "URL_ACCESSED", `${contactPageUrl} にアクセスしました`);
+
+      if (await this.checkBlocked(acquired.session, status)) {
+        await this.runRepository.appendLog(
+          run.id,
+          "WARN",
+          "SITE_BLOCKED",
+          "Bot対策（Cloudflare等）によりアクセスを拒否/ブロックされました",
+        );
+        finalStatus = "BLOCKED";
+        await this.runRepository.updateStatus(run.id, finalStatus, {
+          errorStep: "SITE_BLOCKED",
+          finishedAt: new Date(),
+        });
+        await this.targetRepository.updateStatus(target.id, finalStatus);
+        return;
+      }
 
       const contactScreenshotPath = await this.screenshotService.capture(acquired.session, run.id, "CONTACT_PAGE");
       await this.runRepository.addScreenshot(run.id, "CONTACT_PAGE", contactScreenshotPath);
@@ -424,7 +451,7 @@ export class RunOrchestrator {
     run: Run,
   ): Promise<
     | { ok: true; contactPageUrl: string }
-    | { ok: false; finalStatus: "NOT_SENDABLE" | "FAILED"; errorStep: string; errorMessage?: string }
+    | { ok: false; finalStatus: "NOT_SENDABLE" | "FAILED" | "BLOCKED"; errorStep: string; errorMessage?: string }
   > {
     await this.runRepository.appendLog(
       run.id,
@@ -459,7 +486,10 @@ export class RunOrchestrator {
 
     const headless = await this.headlessSessionFactory.acquire(`${target.id}-probe`);
     try {
-      await headless.session.goto(target.url, { timeoutMs: NAV_TIMEOUT_MS });
+      const topLevelGoto = await headless.session.goto(target.url, { timeoutMs: NAV_TIMEOUT_MS });
+      if (await this.checkBlocked(headless.session, topLevelGoto.status)) {
+        return { ok: false, finalStatus: "BLOCKED", errorStep: "SITE_BLOCKED" };
+      }
 
       let contactPageUrl = httpResult.contactPageUrl;
       if (!contactPageUrl) {
@@ -471,7 +501,11 @@ export class RunOrchestrator {
         return { ok: false, finalStatus: "NOT_SENDABLE", errorStep: "CONTACT_PAGE_NOT_FOUND" };
       }
 
-      await headless.session.goto(contactPageUrl, { timeoutMs: NAV_TIMEOUT_MS });
+      const contactGoto = await headless.session.goto(contactPageUrl, { timeoutMs: NAV_TIMEOUT_MS });
+      if (await this.checkBlocked(headless.session, contactGoto.status)) {
+        return { ok: false, finalStatus: "BLOCKED", errorStep: "SITE_BLOCKED" };
+      }
+
       const forms = await this.formParser.parseForms(headless.session);
       if (forms.length === 0) {
         return { ok: false, finalStatus: "NOT_SENDABLE", errorStep: "NO_FORM_FOUND" };
