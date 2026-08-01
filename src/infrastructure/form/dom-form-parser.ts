@@ -3,8 +3,8 @@ import type { BrowserSession } from "../../domain/ports/browser-session.port";
 import type { FormParser } from "../../domain/ports/form-parser.port";
 
 /** ページ内評価で使う抽出結果。frameUrlはあとから呼び出し側で埋める（フレーム内では自分自身のURLを知らないため）。 */
-type ExtractedField = Omit<ParsedForm["fields"][number], "frameUrl">;
-type ExtractedForm = {
+export type ExtractedField = Omit<ParsedForm["fields"][number], "frameUrl">;
+export type ExtractedForm = {
   formSelector: string;
   fields: readonly ExtractedField[];
 };
@@ -50,7 +50,11 @@ export class DomFormParser implements FormParser {
   }
 }
 
-function extractFormsInCurrentDocument(): ExtractedForm[] {
+/**
+ * page.evaluate()に渡す関数そのもの。外部の変数を参照しない自己完結した関数なので、
+ * ブラウザへ渡す用途とテスト用途（jsdomへ直接呼び出す）の両方でそのまま使い回せる。
+ */
+export function extractFormsInCurrentDocument(): ExtractedForm[] {
   function cssEscapeId(value: string): string {
     if (typeof CSS !== "undefined" && CSS.escape) return CSS.escape(value);
     return value.replace(/[^a-zA-Z0-9_-]/g, (c) => `\\${c}`);
