@@ -13,6 +13,7 @@ export const ERROR_STEP_LABELS: Record<string, string> = {
   FIELD_FILL_FAILED: "一部の必須フィールドに入力できませんでした（非表示要素等）",
   NOT_READY: "送信可能なURLが未確定です（先に探索が必要）",
   SITE_BLOCKED: "Bot対策（Cloudflare等）によりアクセスを拒否/ブロックされました",
+  SALES_PROHIBITED: "営業・勧誘目的の問い合わせをお断りする旨の記載を検知しました",
 };
 
 export function errorStepLabel(errorStep: string | null | undefined): string {

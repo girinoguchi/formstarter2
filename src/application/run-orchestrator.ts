@@ -5,7 +5,7 @@ import type { ParsedForm, ParsedFormField } from "../domain/entities/form-field"
 import type { Profile } from "../domain/entities/profile";
 import type { Run } from "../domain/entities/run";
 import type { Target } from "../domain/entities/target";
-import type { BlockDetector } from "../domain/ports/block-detector.port";
+import type { BlockCheckResult, BlockDetector } from "../domain/ports/block-detector.port";
 import type { BrowserSession } from "../domain/ports/browser-session.port";
 import type { BrowserSessionFactory } from "../domain/ports/browser-session-factory.port";
 import type { ConfirmationPageDetector } from "../domain/ports/confirmation-page-detector.port";
@@ -78,13 +78,24 @@ export class RunOrchestrator {
     private readonly blockDetector: BlockDetector,
   ) {}
 
-  /** ナビゲーション直後にCloudflare等のBot対策で拒否/チャレンジされていないか確認する。 */
-  private async checkBlocked(session: BrowserSession, status: number | null): Promise<boolean> {
-    const { title, bodyText } = await session.evaluate(() => ({
-      title: document.title,
-      bodyText: document.body?.innerText?.slice(0, 2000) ?? "",
-    }));
-    return this.blockDetector.isBlocked({ status, title, bodyText });
+  /**
+   * ナビゲーション直後に、Cloudflare等のBot対策チャレンジ、または「営業お断り」等の
+   * 営業禁止文言が無いか確認する。header/footer/nav/asideはプライバシーポリシーへの
+   * リンク等、無関係な定型文言を含みがちで営業禁止文言の誤検知源になりやすいため、
+   * 判定対象のテキストからは除外する（FormStarterappで実際に踏んだ問題を踏襲）。
+   */
+  private async checkBlocked(session: BrowserSession, status: number | null): Promise<BlockCheckResult> {
+    const { title, bodyText } = await session.evaluate(() => {
+      const EXCLUDE_SELECTOR =
+        'footer, header, nav, aside, [role="contentinfo"], [role="banner"], [role="navigation"], [role="complementary"]';
+      const clone = document.body?.cloneNode(true) as HTMLElement | undefined;
+      clone?.querySelectorAll(EXCLUDE_SELECTOR).forEach((n) => n.remove());
+      return {
+        title: document.title,
+        bodyText: (clone?.innerText ?? "").slice(0, 5000),
+      };
+    });
+    return this.blockDetector.check({ status, title, bodyText });
   }
 
   /** CSVインポート後のExplorePool用/UIの「探索」用: Run行の作成まで待ち、あとはバックグラウンドで継続する。 */
@@ -210,16 +221,19 @@ export class RunOrchestrator {
       const { status } = await acquired.session.goto(contactPageUrl, { timeoutMs: NAV_TIMEOUT_MS });
       await this.runRepository.appendLog(run.id, "INFO", "URL_ACCESSED", `${contactPageUrl} にアクセスしました`);
 
-      if (await this.checkBlocked(acquired.session, status)) {
+      const blockCheck = await this.checkBlocked(acquired.session, status);
+      if (blockCheck.blocked) {
+        const errorStep = blockErrorStep(blockCheck.kind);
         await this.runRepository.appendLog(
           run.id,
           "WARN",
-          "SITE_BLOCKED",
-          "Bot対策（Cloudflare等）によりアクセスを拒否/ブロックされました",
+          errorStep,
+          blockCheck.reason ?? "アクセスがブロックされました",
         );
         finalStatus = "BLOCKED";
         await this.runRepository.updateStatus(run.id, finalStatus, {
-          errorStep: "SITE_BLOCKED",
+          errorStep,
+          errorMessage: blockCheck.reason,
           finishedAt: new Date(),
         });
         await this.targetRepository.updateStatus(target.id, finalStatus);
@@ -487,8 +501,14 @@ export class RunOrchestrator {
     const headless = await this.headlessSessionFactory.acquire(`${target.id}-probe`);
     try {
       const topLevelGoto = await headless.session.goto(target.url, { timeoutMs: NAV_TIMEOUT_MS });
-      if (await this.checkBlocked(headless.session, topLevelGoto.status)) {
-        return { ok: false, finalStatus: "BLOCKED", errorStep: "SITE_BLOCKED" };
+      const topBlockCheck = await this.checkBlocked(headless.session, topLevelGoto.status);
+      if (topBlockCheck.blocked) {
+        return {
+          ok: false,
+          finalStatus: "BLOCKED",
+          errorStep: blockErrorStep(topBlockCheck.kind),
+          errorMessage: topBlockCheck.reason,
+        };
       }
 
       let contactPageUrl = httpResult.contactPageUrl;
@@ -502,8 +522,14 @@ export class RunOrchestrator {
       }
 
       const contactGoto = await headless.session.goto(contactPageUrl, { timeoutMs: NAV_TIMEOUT_MS });
-      if (await this.checkBlocked(headless.session, contactGoto.status)) {
-        return { ok: false, finalStatus: "BLOCKED", errorStep: "SITE_BLOCKED" };
+      const contactBlockCheck = await this.checkBlocked(headless.session, contactGoto.status);
+      if (contactBlockCheck.blocked) {
+        return {
+          ok: false,
+          finalStatus: "BLOCKED",
+          errorStep: blockErrorStep(contactBlockCheck.kind),
+          errorMessage: contactBlockCheck.reason,
+        };
       }
 
       const forms = await this.formParser.parseForms(headless.session);
@@ -588,6 +614,11 @@ export class RunOrchestrator {
 
     return true;
   }
+}
+
+/** BLOCKED判定の種類からRunに記録するerrorStepを選ぶ。 */
+function blockErrorStep(kind: BlockCheckResult["kind"]): string {
+  return kind === "SALES_PROHIBITED" ? "SALES_PROHIBITED" : "SITE_BLOCKED";
 }
 
 function safeHostname(url: string): string {
