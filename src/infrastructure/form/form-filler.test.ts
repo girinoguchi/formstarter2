@@ -146,9 +146,33 @@ describe("PlaywrightFormFiller conditional-category forms", () => {
     expect(session.calls).toContain("select:#category=3");
   });
 
-  it("falls back to the first real option when there is no 'その他' choice either", async () => {
-    // kurashi-no-techo.co.jpの投稿種別選択のように、サイト固有の選択肢しか無く
-    // 「その他」自体が存在しないケース。プレースホルダ(空欄)を除いた最初の選択肢を選ぶ。
+  it("prefers an option mentioning 取材/お問い合わせ over an unrelated first option", async () => {
+    // kurashi-no-techo.co.jpの投稿種別選択のように「その他」自体は無いが、
+    // 「小社への取材に関するお問い合わせ」のような汎用の問い合わせ寄りの選択肢がある
+    // 場合は、雑誌の投稿カテゴリ(読者の手帖等)より先にそちらを選ぶ。
+    const categoryField = field({
+      selector: "#category",
+      type: "select",
+      options: [
+        { value: "", label: "選択してください" },
+        { value: "reader", label: "読者の手帖" },
+        { value: "apron", label: "エプロンメモ" },
+        { value: "press", label: "小社への取材に関するお問い合わせ" },
+      ],
+    });
+    const classifications: FieldClassification[] = [
+      { fieldSelector: "#category", fieldLabel: "ご用件", category: "INQUIRY_TYPE", source: "RULE", confidence: 0.8 },
+    ];
+
+    const session = new FakeSession();
+    await new PlaywrightFormFiller().fill(session, [categoryField], classifications, PROFILE);
+
+    expect(session.calls).toContain("select:#category=press");
+  });
+
+  it("falls back to the first real option when nothing generic-sounding exists either", async () => {
+    // 「その他」も「取材」「お問い合わせ」を含む選択肢も無いケース。
+    // プレースホルダ(空欄)を除いた最初の選択肢を選ぶ。
     const categoryField = field({
       selector: "#category",
       type: "select",
