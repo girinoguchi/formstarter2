@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+import { errorStepLabel } from "../../domain/value-objects/error-step";
 import type { TargetListItem } from "../hooks/use-targets";
 import { RunStatusBadge } from "./run-status-badge";
 
@@ -15,6 +16,7 @@ interface TargetTableProps {
 }
 
 const RUNNING_LIKE_STATUSES = new Set(["QUEUED", "RUNNING"]);
+const FAILED_LIKE_STATUSES = new Set(["FAILED", "NOT_SENDABLE", "BLOCKED", "NEEDS_REVIEW"]);
 
 export function TargetTable({ targets }: TargetTableProps) {
   const queryClient = useQueryClient();
@@ -51,17 +53,27 @@ export function TargetTable({ targets }: TargetTableProps) {
         {targets.map((target) => (
           <TableRow key={target.id}>
             <TableCell className="max-w-[260px]">
-              <Link
-                href={`/targets/${target.id}`}
+              <a
+                href={target.url}
+                target="_blank"
+                rel="noopener noreferrer"
                 title={target.url}
                 className="block truncate text-primary hover:underline"
               >
                 {target.url}
-              </Link>
+              </a>
             </TableCell>
             <TableCell className="max-w-[140px] truncate">{target.companyName ?? "—"}</TableCell>
-            <TableCell>
+            <TableCell className="max-w-[280px] align-top">
               <RunStatusBadge status={target.status} />
+              {FAILED_LIKE_STATUSES.has(target.status) && target.latestErrorStep && (
+                <p
+                  className="mt-1 line-clamp-2 whitespace-normal text-xs text-muted-foreground"
+                  title={errorStepLabel(target.latestErrorStep)}
+                >
+                  {errorStepLabel(target.latestErrorStep)}
+                </p>
+              )}
             </TableCell>
             <TableCell className="text-muted-foreground">
               {new Date(target.updatedAt).toLocaleString("ja-JP")}

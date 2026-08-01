@@ -14,9 +14,15 @@ export interface TargetListFilter {
   search?: string;
 }
 
+/** 一覧表示用。直近のRunの失敗理由（未加工のerrorStep/errorMessage）を併せて返す。 */
+export interface TargetListItem extends Target {
+  latestErrorStep: string | null;
+  latestErrorMessage: string | null;
+}
+
 export interface TargetRepository {
   findById(id: string): Promise<Target | null>;
-  list(filter: TargetListFilter): Promise<readonly Target[]>;
+  list(filter: TargetListFilter): Promise<readonly TargetListItem[]>;
   createImportBatch(fileName: string): Promise<string>;
   createMany(targets: readonly CreateTargetInput[]): Promise<readonly Target[]>;
   updateStatus(

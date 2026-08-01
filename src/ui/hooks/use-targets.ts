@@ -13,6 +13,9 @@ export interface TargetListItem {
   profileId: string;
   createdAt: string;
   updatedAt: string;
+  /** 一覧取得(GET /api/targets)でのみ返る。単体取得では含まれないためoptional。 */
+  latestErrorStep?: string | null;
+  latestErrorMessage?: string | null;
 }
 
 interface UseTargetsOptions {

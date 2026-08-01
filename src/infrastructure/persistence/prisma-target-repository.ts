@@ -4,6 +4,7 @@ import type { Target } from "../../domain/entities/target";
 import type {
   CreateTargetInput,
   TargetListFilter,
+  TargetListItem,
   TargetRepository,
 } from "../../domain/ports/target-repository.port";
 import type { TargetStatus } from "../../domain/value-objects/run-status";
@@ -31,7 +32,7 @@ export class PrismaTargetRepository implements TargetRepository {
     return row ? toDomain(row) : null;
   }
 
-  async list(filter: TargetListFilter): Promise<readonly Target[]> {
+  async list(filter: TargetListFilter): Promise<readonly TargetListItem[]> {
     const rows = await this.client.target.findMany({
       where: {
         deletedAt: null,
@@ -46,9 +47,15 @@ export class PrismaTargetRepository implements TargetRepository {
             }
           : {}),
       },
+      // 一覧に失敗理由を出すため、直近のRun1件だけ併せて取得する。
+      include: { runs: { orderBy: { createdAt: "desc" }, take: 1 } },
       orderBy: { createdAt: "desc" },
     });
-    return rows.map(toDomain);
+    return rows.map((row) => ({
+      ...toDomain(row),
+      latestErrorStep: row.runs[0]?.errorStep ?? null,
+      latestErrorMessage: row.runs[0]?.errorMessage ?? null,
+    }));
   }
 
   async createImportBatch(fileName: string): Promise<string> {
