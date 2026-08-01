@@ -11,6 +11,14 @@ export class PlaywrightBrowserPage implements BrowserSession {
 
   async goto(url: string, options?: { timeoutMs?: number }): Promise<{ status: number | null }> {
     const response = await this.page.goto(url, { waitUntil: "domcontentloaded", timeout: options?.timeoutMs });
+    // Nuxt/Next/Vue/React等のSPAは、domcontentloaded時点ではJSによる描画が完了しておらず、
+    // ナビゲーションリンクやフォーム自体がまだDOMに存在しないことがある。実データ
+    // (livesearch.co.jp等)で、domcontentloaded直後はリンク0件、2秒待つだけで
+    // 「お問い合わせ」リンクを含む24件が現れるケースを確認した——問い合わせページ探索・
+    // フォーム解析どちらもこれを踏むと「見つからない」誤判定になる。常時ポーリング/
+    // analytics接続を持つサイトではnetworkidleに到達しないことがあるため、
+    // ベストエフォート（タイムアウトしても無視）で短時間だけ追加で待つ。
+    await this.page.waitForLoadState("networkidle", { timeout: 3_000 }).catch(() => {});
     return { status: response?.status() ?? null };
   }
 
