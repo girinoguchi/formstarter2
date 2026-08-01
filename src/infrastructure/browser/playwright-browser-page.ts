@@ -91,6 +91,10 @@ export class PlaywrightBrowserPage implements BrowserSession {
     return this.page.textContent(selector);
   }
 
+  async wait(ms: number): Promise<void> {
+    await this.page.waitForTimeout(ms);
+  }
+
   async screenshot(): Promise<Buffer> {
     return this.page.screenshot();
   }

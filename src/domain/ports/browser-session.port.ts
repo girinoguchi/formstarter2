@@ -27,6 +27,12 @@ export interface BrowserSession {
   click(selector: string, options?: { frameUrl?: string }): Promise<void>;
   isVisible(selector: string, options?: { frameUrl?: string }): Promise<boolean>;
   textContent(selector: string): Promise<string | null>;
+  /**
+   * カテゴリ選択(INQUIRY_TYPE)によって他のフィールドの表示/非表示がJSで切り替わる
+   * 条件付きフォーム(azito.co.jp等)向け。選択直後にクラス切り替えが反映されるまでの
+   * 短い猶予を作るためだけに使う——それ以外の待機目的では使わないこと。
+   */
+  wait(ms: number): Promise<void>;
 
   screenshot(): Promise<Buffer>;
   close(): Promise<void>;

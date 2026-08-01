@@ -19,6 +19,13 @@ const TEXT_LIKE_FIELD_TYPES: readonly ParsedFormField["type"][] = [
 // 入力失敗が他の全項目を巻き添えにして待たせないよう、短めに設定して早く諦める。
 const FIELD_FILL_TIMEOUT_MS = 5_000;
 
+// 「その他」的な選択肢。冷やかしではない自社の売り込み内容が、相手サイトの
+// 用意した固定カテゴリ(採用について/見積もり依頼等)のどれにも一致しないのは
+// 自然なことなので、一致しない場合はこれを選ぶほうが「未選択のまま」より
+// 送信可能な状態に近づける（azito.co.jp等、未選択のままだと基本項目まで
+// 条件付き非表示のままになる実データで確認）。
+const OTHER_OPTION_PATTERN = /その他|other/i;
+
 function normalize(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -94,44 +101,81 @@ export class PlaywrightFormFiller implements FormFiller {
     const fieldsBySelector = new Map(fields.map((f) => [f.selector, f]));
     const failures: FieldFillFailure[] = [];
 
-    for (const classification of classifications) {
-      const field = fieldsBySelector.get(classification.fieldSelector);
-      if (!field || classification.category === "UNKNOWN") continue;
+    // 「ご用件」等のカテゴリ選択(INQUIRY_TYPE)によって他のフィールドの表示/非表示が
+    // JSで切り替わる条件付きフォーム(azito.co.jp等の実データで確認、未選択のままだと
+    // 名前・会社名・住所等の基本項目までCSSで非表示のままになっていた)があるため、
+    // INQUIRY_TYPEを先に処理し、JS側の表示切り替えが反映されるのを少し待ってから
+    // 残りのフィールドを処理する。
+    const inquiryTypeClassifications = classifications.filter((c) => c.category === "INQUIRY_TYPE");
+    const restClassifications = classifications.filter((c) => c.category !== "INQUIRY_TYPE");
 
-      try {
-        if (classification.category === "CONSENT_CHECKBOX") {
-          if (field.type === "checkbox" && profile.consentPolicy) {
-            const frameUrl = field.frameUrl ?? undefined;
-            if (!(await session.isVisible(field.selector, { frameUrl }))) {
-              throw new Error(`要素が非表示のためスキップしました: ${field.selector}`);
-            }
-            await session.check(field.selector, { timeoutMs: FIELD_FILL_TIMEOUT_MS, frameUrl });
-          }
-          continue;
-        }
+    let selectedInquiryType = false;
+    for (const classification of inquiryTypeClassifications) {
+      const filled = await this.fillClassification(session, fieldsBySelector, classification, profile, failures);
+      if (filled) selectedInquiryType = true;
+    }
 
-        const rawValue = resolveProfileValue(classification.category, profile);
-        if (!rawValue) continue;
+    if (selectedInquiryType) {
+      await session.wait(500);
+    }
 
-        await this.fillOne(session, field, rawValue);
-      } catch (error) {
-        // 1項目の入力失敗（非表示要素等）で他の項目の入力を止めない。
-        // ベストエフォートで続行し、失敗した項目だけ呼び出し側に報告する。
-        const message = error instanceof Error ? error.message : String(error);
-        failures.push({
-          fieldSelector: field.selector,
-          fieldLabel: field.label,
-          category: classification.category,
-          required: field.required,
-          message,
-        });
-      }
+    for (const classification of restClassifications) {
+      await this.fillClassification(session, fieldsBySelector, classification, profile, failures);
     }
 
     return failures;
   }
 
-  private async fillOne(session: BrowserSession, field: ParsedFormField, value: string): Promise<void> {
+  /** 1フィールド分の入力を試みる。成功したかどうかを返し、失敗はfailuresへベストエフォートで記録する。 */
+  private async fillClassification(
+    session: BrowserSession,
+    fieldsBySelector: ReadonlyMap<string, ParsedFormField>,
+    classification: FieldClassification,
+    profile: Profile,
+    failures: FieldFillFailure[],
+  ): Promise<boolean> {
+    const field = fieldsBySelector.get(classification.fieldSelector);
+    if (!field || classification.category === "UNKNOWN") return false;
+
+    try {
+      if (classification.category === "CONSENT_CHECKBOX") {
+        if (field.type === "checkbox" && profile.consentPolicy) {
+          const frameUrl = field.frameUrl ?? undefined;
+          if (!(await session.isVisible(field.selector, { frameUrl }))) {
+            throw new Error(`要素が非表示のためスキップしました: ${field.selector}`);
+          }
+          await session.check(field.selector, { timeoutMs: FIELD_FILL_TIMEOUT_MS, frameUrl });
+          return true;
+        }
+        return false;
+      }
+
+      const rawValue = resolveProfileValue(classification.category, profile);
+      if (!rawValue) return false;
+
+      await this.fillOne(session, field, rawValue, classification.category);
+      return true;
+    } catch (error) {
+      // 1項目の入力失敗（非表示要素等）で他の項目の入力を止めない。
+      // ベストエフォートで続行し、失敗した項目だけ呼び出し側に報告する。
+      const message = error instanceof Error ? error.message : String(error);
+      failures.push({
+        fieldSelector: field.selector,
+        fieldLabel: field.label,
+        category: classification.category,
+        required: field.required,
+        message,
+      });
+      return false;
+    }
+  }
+
+  private async fillOne(
+    session: BrowserSession,
+    field: ParsedFormField,
+    value: string,
+    category: FieldCategory,
+  ): Promise<void> {
     const frameUrl = field.frameUrl ?? undefined;
 
     // 非表示要素（レスポンシブ対応の重複フィールドや、他の選択肢用に隠れている
@@ -149,7 +193,9 @@ export class PlaywrightFormFiller implements FormFiller {
     }
 
     if (field.type === "select" && field.options) {
-      const option = findBestOption(field.options, value);
+      const option =
+        findBestOption(field.options, value) ??
+        (category === "INQUIRY_TYPE" ? field.options.find((o) => OTHER_OPTION_PATTERN.test(o.label)) : undefined);
       if (option) {
         await session.selectOption(field.selector, option.value, { timeoutMs: FIELD_FILL_TIMEOUT_MS, frameUrl });
       }

@@ -65,7 +65,19 @@ export const ALIAS_RULES: readonly AliasRule[] = [
   },
   {
     category: "INQUIRY_TYPE",
-    patterns: [/お問い合わせ種別/, /種別/, /件名/, /\bsubject\b/i, /inquiry[\s-]*type/i, /\bcategory\b/i],
+    // 「ご用件」はカテゴリ選択に多用される表現だが辞書に無く、この選択でJS側の表示/
+    // 非表示が切り替わる条件付きフォーム(azito.co.jp等)で、選択されないまま名前・
+    // 会社名・住所等の基本項目までCSSで非表示のままになる実バグがあった。
+    patterns: [
+      /お問い合わせ種別/,
+      /種別/,
+      /件名/,
+      /ご用件/,
+      /用件/,
+      /\bsubject\b/i,
+      /inquiry[\s-]*type/i,
+      /\bcategory\b/i,
+    ],
   },
   {
     category: "INQUIRY_BODY",

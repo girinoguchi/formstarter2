@@ -70,4 +70,19 @@ describe("RuleBasedFieldClassifier against real site fixtures", () => {
     const categories = await classifyFixture("kurashi-no-techo-contact.html");
     expect(categories.get("your-adrs")).toBe("ADDRESS");
   });
+
+  // azito.co.jp: 「ご用件」というカテゴリ選択(select)によって、名前・会社名・住所等の
+  // 基本項目までJSで条件付き非表示になる実データ。「ご用件」が辞書に無くINQUIRY_TYPEに
+  // 分類されないと、カテゴリが選択されないまま基本項目が非表示のままになる実バグが
+  // あった（PlaywrightFormFillerのカテゴリ優先処理と対になる回帰テスト）。
+  it("classifies azito.co.jp's category select as INQUIRY_TYPE", async () => {
+    const categories = await classifyFixture("azito-contact.html");
+
+    expect(categories.get("contact_type")).toBe("INQUIRY_TYPE");
+    expect(categories.get("name")).toBe("FULL_NAME");
+    expect(categories.get("company_name")).toBe("COMPANY_NAME");
+    expect(categories.get("address")).toBe("ADDRESS");
+    expect(categories.get("email")).toBe("EMAIL");
+    expect(categories.get("content")).toBe("INQUIRY_BODY");
+  });
 });
