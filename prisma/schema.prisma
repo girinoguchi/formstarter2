@@ -71,6 +71,12 @@ enum FieldCategory {
   INQUIRY_BODY
   CONSENT_CHECKBOX
   UNKNOWN
+  FIRST_NAME
+  LAST_NAME
+  DEPARTMENT
+  JOB_TITLE
+  DEPARTMENT_JOB_TITLE
+  INDUSTRY
 }
 
 enum ClassificationSource {

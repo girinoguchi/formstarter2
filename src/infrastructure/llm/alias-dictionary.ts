@@ -64,6 +64,40 @@ export const ALIAS_RULES: readonly AliasRule[] = [
     patterns: [/お名前/, /氏名/, /full[\s-]*name/i, /your[\s-]*name/i, /^name$/i],
   },
   {
+    // 「名」「姓」で姓名が別々の入力欄に分かれているフォーム（Marketo/HubSpot等の
+    // 海外製フォーム埋め込みでよく見る"First Name"/"Last Name"の日本語ローカライズ）
+    // は、氏名(FULL_NAME)の辞書に一致せず、姓・名それぞれUNKNOWNのまま未入力になる
+    // 実バグがあった(intralinks.com/jp/contact等の実データで確認)。プロフィールには
+    // firstName/lastNameが元々あるのに、分類先が無く一度も使われていなかった。
+    // "^名$"/"^姓$"は他の属性(name/id等)と結合された検索文字列全体が完全に
+    // その1文字だけの場合のみ一致する最終手段——"会社名""部署名"等への誤爆を避ける。
+    category: "FIRST_NAME",
+    patterns: [/first[\s-]*name/i, /given[\s-]*name/i, /下の名前/, /^名$/],
+  },
+  {
+    category: "LAST_NAME",
+    patterns: [/last[\s-]*name/i, /surname/i, /family[\s-]*name/i, /苗字/, /^名字$/, /^姓$/],
+  },
+  {
+    // 「部署名/役職名」のように部署と役職が1つの入力欄にまとまっているケース
+    // (intralinks.com/jp/contact等)を、部署名だけ・役職名だけの単独パターンより
+    // 先に評価する（後者が先に一致すると片方の値しか使われなくなるため）。
+    category: "DEPARTMENT_JOB_TITLE",
+    patterns: [/部署名?[\s/／・]*役職名?/, /department[\s/]*(and|&)?[\s/]*(job[\s-]*)?title/i],
+  },
+  {
+    category: "DEPARTMENT",
+    patterns: [/部署/, /所属/, /\bdepartment\b/i],
+  },
+  {
+    category: "JOB_TITLE",
+    patterns: [/役職/, /肩書/, /job[\s-]*title/i, /\bposition\b/i],
+  },
+  {
+    category: "INDUSTRY",
+    patterns: [/業種/, /業界/, /\bindustry\b/i],
+  },
+  {
     category: "INQUIRY_TYPE",
     // 「ご用件」はカテゴリ選択に多用される表現だが辞書に無く、この選択でJS側の表示/
     // 非表示が切り替わる条件付きフォーム(azito.co.jp等)で、選択されないまま名前・

@@ -88,9 +88,9 @@ const PROFILE: Profile = {
   lastNameKana: "",
   firstNameKana: "",
   furigana: "",
-  department: "",
-  jobTitle: "",
-  industry: "",
+  department: "営業部",
+  jobTitle: "課長",
+  industry: "IT・ソフトウェア",
   employeeCount: "",
   email: "test@example.com",
   phone1: "03",
@@ -190,5 +190,52 @@ describe("PlaywrightFormFiller conditional-category forms", () => {
     await new PlaywrightFormFiller().fill(session, [categoryField], classifications, PROFILE);
 
     expect(session.calls).toContain("select:#category=reader");
+  });
+});
+
+describe("PlaywrightFormFiller split name / department / industry fields", () => {
+  // intralinks.com/jp/contact: 姓・名が別々の入力欄で、部署名/役職名が1つの
+  // 入力欄にまとまっているフォーム。プロフィールにfirstName/lastName/department/
+  // jobTitleが元々あるのに分類先が無く未入力のまま残っていた実バグの回帰テスト。
+  it("fills separate first-name/last-name fields and a combined department/job-title field", async () => {
+    // FakeSessionのisVisible()はカテゴリ選択(#category)が済むまでtrueを返さない
+    // （条件付きフォームの再現用の作り）ため、他のテストと同様にダミーの
+    // INQUIRY_TYPE分類を先に処理させて可視状態にする。
+    const categoryField = field({ selector: "#category", type: "select", options: [{ value: "1", label: "その他" }] });
+    const firstNameField = field({ selector: "#first", label: "名" });
+    const lastNameField = field({ selector: "#last", label: "姓" });
+    const deptTitleField = field({ selector: "#dept-title", label: "部署名/役職名" });
+    const industryField = field({
+      selector: "#industry",
+      type: "select",
+      label: "業種",
+      options: [
+        { value: "it", label: "IT・ソフトウェア" },
+        { value: "finance", label: "金融" },
+      ],
+    });
+    const fields = [categoryField, firstNameField, lastNameField, deptTitleField, industryField];
+    const classifications: FieldClassification[] = [
+      { fieldSelector: "#category", fieldLabel: "ご用件", category: "INQUIRY_TYPE", source: "RULE", confidence: 0.8 },
+      { fieldSelector: "#first", fieldLabel: "名", category: "FIRST_NAME", source: "RULE", confidence: 0.8 },
+      { fieldSelector: "#last", fieldLabel: "姓", category: "LAST_NAME", source: "RULE", confidence: 0.8 },
+      {
+        fieldSelector: "#dept-title",
+        fieldLabel: "部署名/役職名",
+        category: "DEPARTMENT_JOB_TITLE",
+        source: "RULE",
+        confidence: 0.8,
+      },
+      { fieldSelector: "#industry", fieldLabel: "業種", category: "INDUSTRY", source: "RULE", confidence: 0.8 },
+    ];
+
+    const session = new FakeSession();
+    const failures = await new PlaywrightFormFiller().fill(session, fields, classifications, PROFILE);
+
+    expect(failures).toHaveLength(0);
+    expect(session.calls).toContain("fill:#first=太郎");
+    expect(session.calls).toContain("fill:#last=山田");
+    expect(session.calls).toContain("fill:#dept-title=営業部 課長");
+    expect(session.calls).toContain("select:#industry=it");
   });
 });

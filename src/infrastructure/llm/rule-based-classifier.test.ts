@@ -113,4 +113,64 @@ describe("RuleBasedFieldClassifier against real site fixtures", () => {
     });
     expect(classification?.category).toBe("CONSENT_CHECKBOX");
   });
+
+  // intralinks.com/jp/contact: 姓/名が別々の入力欄に分かれており、部署名/役職名が
+  // 1つの入力欄にまとまっているフォーム。プロフィールにはfirstName/lastName/
+  // department/jobTitleが元々あるのに、対応する分類先が無く一度も使われず
+  // 未入力のまま残っていた実バグの回帰テスト。
+  describe("classifies split name / department-job-title / industry fields (intralinks.com-style forms)", () => {
+    function makeField(overrides: Partial<ParsedFormField>): ParsedFormField {
+      return {
+        selector: "#field",
+        type: "text",
+        name: null,
+        id: null,
+        placeholder: null,
+        label: null,
+        required: false,
+        value: null,
+        ariaLabel: null,
+        autocomplete: null,
+        options: null,
+        frameUrl: null,
+        ...overrides,
+      };
+    }
+
+    async function classifyOne(field: ParsedFormField) {
+      const classifier = new RuleBasedFieldClassifier();
+      const [classification] = await classifier.classify([field], { hostKey: "test", formSignatureHash: "test" });
+      return classification?.category;
+    }
+
+    it('classifies a field labeled just "名" as FIRST_NAME', async () => {
+      expect(await classifyOne(makeField({ label: "名" }))).toBe("FIRST_NAME");
+    });
+
+    it('classifies a field labeled just "姓" as LAST_NAME', async () => {
+      expect(await classifyOne(makeField({ label: "姓" }))).toBe("LAST_NAME");
+    });
+
+    it('classifies "部署名/役職名" as the combined DEPARTMENT_JOB_TITLE category', async () => {
+      expect(await classifyOne(makeField({ label: "部署名/役職名" }))).toBe("DEPARTMENT_JOB_TITLE");
+    });
+
+    it('classifies a standalone "部署" field as DEPARTMENT (not DEPARTMENT_JOB_TITLE)', async () => {
+      expect(await classifyOne(makeField({ label: "部署" }))).toBe("DEPARTMENT");
+    });
+
+    it('classifies a standalone "役職" field as JOB_TITLE', async () => {
+      expect(await classifyOne(makeField({ label: "役職" }))).toBe("JOB_TITLE");
+    });
+
+    it('classifies "業種" as INDUSTRY', async () => {
+      expect(await classifyOne(makeField({ label: "業種" }))).toBe("INDUSTRY");
+    });
+
+    // "会社名"/"貴社名"は"名"を含むが、FIRST_NAMEの"^名$"は文字列全体が完全に
+    // 一致した場合のみ発火するため誤爆しないことの確認。
+    it('still classifies "貴社名" as COMPANY_NAME, not FIRST_NAME', async () => {
+      expect(await classifyOne(makeField({ label: "貴社名" }))).toBe("COMPANY_NAME");
+    });
+  });
 });

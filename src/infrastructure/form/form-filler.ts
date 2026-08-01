@@ -37,6 +37,12 @@ function combineName(last: string, first: string): string | null {
   return combined || null;
 }
 
+/** 「部署名/役職名」のように1つの入力欄に両方をまとめて書く必要があるフォーム向け。 */
+function combineDepartmentJobTitle(department: string, jobTitle: string): string | null {
+  const combined = [department, jobTitle].filter((v) => v.trim() !== "").join(" ");
+  return combined || null;
+}
+
 function combinePhone(phone1: string, phone2: string, phone3: string): string | null {
   const parts = [phone1, phone2, phone3].filter((v) => v.trim() !== "");
   return parts.length > 0 ? parts.join("-") : null;
@@ -54,6 +60,10 @@ function resolveProfileValue(category: FieldCategory, profile: Profile): string 
     case "CONTACT_PERSON":
     case "FULL_NAME":
       return profile.fullName || combineName(profile.lastName, profile.firstName);
+    case "FIRST_NAME":
+      return profile.firstName || null;
+    case "LAST_NAME":
+      return profile.lastName || null;
     case "FURIGANA":
       return profile.furigana || combineName(profile.lastNameKana, profile.firstNameKana);
     case "EMAIL":
@@ -66,6 +76,14 @@ function resolveProfileValue(category: FieldCategory, profile: Profile): string 
       return profile.postalCode || null;
     case "URL":
       return profile.websiteUrl || null;
+    case "DEPARTMENT":
+      return profile.department || null;
+    case "JOB_TITLE":
+      return profile.jobTitle || null;
+    case "DEPARTMENT_JOB_TITLE":
+      return combineDepartmentJobTitle(profile.department, profile.jobTitle);
+    case "INDUSTRY":
+      return profile.industry || null;
     case "INQUIRY_TYPE":
       return profile.inquiryType || null;
     case "INQUIRY_BODY":
