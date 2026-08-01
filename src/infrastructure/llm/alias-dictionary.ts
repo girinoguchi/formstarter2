@@ -24,7 +24,11 @@ export const ALIAS_RULES: readonly AliasRule[] = [
   // ——後ろに置くと \bcompany\b がそれらを横取りしてしまう。
   {
     category: "EMAIL",
-    patterns: [/メールアドレス/, /メール/, /e-?mail/i],
+    // f_mail/mail_addressのように"email"ではなく素の"mail"だけのname属性が
+    // 実データ(oh-ami.com等)にあり、e-?mailだけでは拾えていなかった。
+    // \bmail\bはbuildSearchText側でアンダースコアをスペース化してから評価されるため、
+    // f_mail→"f mail"となり単語境界として正しくマッチする。
+    patterns: [/メールアドレス/, /メール/, /e-?mail/i, /\bmail\b/i],
   },
   {
     category: "PHONE",
