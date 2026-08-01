@@ -4,6 +4,7 @@ import path from "node:path";
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 
+import type { ParsedFormField } from "../../domain/entities/form-field";
 import { extractFormsInCurrentDocument, type ExtractedField } from "../form/dom-form-parser";
 import { RuleBasedFieldClassifier } from "./rule-based-classifier";
 
@@ -84,5 +85,32 @@ describe("RuleBasedFieldClassifier against real site fixtures", () => {
     expect(categories.get("address")).toBe("ADDRESS");
     expect(categories.get("email")).toBe("EMAIL");
     expect(categories.get("content")).toBe("INQUIRY_BODY");
+  });
+
+  // amami-tourism.org: 個人情報/プライバシーポリシーへの言及がチェックボックスの
+  // labelではなく直前の別要素(<label>で紐付いていない説明文)にあり、チェックボックス
+  // 自身のlabelは「同意する」だけというケース。個人情報/プライバシー等の既存パターンに
+  // 一致せずUNKNOWNのまま自動同意されなかった実バグの回帰テスト。
+  it("classifies a checkbox labeled just '同意する' as CONSENT_CHECKBOX", async () => {
+    const field: ParsedFormField = {
+      selector: "#agree",
+      type: "checkbox",
+      name: "agree",
+      id: "agree",
+      placeholder: null,
+      label: "同意する",
+      required: false,
+      value: null,
+      ariaLabel: null,
+      autocomplete: null,
+      options: null,
+      frameUrl: null,
+    };
+    const classifier = new RuleBasedFieldClassifier();
+    const [classification] = await classifier.classify([field], {
+      hostKey: "test",
+      formSignatureHash: "test",
+    });
+    expect(classification?.category).toBe("CONSENT_CHECKBOX");
   });
 });

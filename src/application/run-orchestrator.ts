@@ -501,6 +501,9 @@ export class RunOrchestrator {
     const headless = await this.headlessSessionFactory.acquire(`${target.id}-probe`);
     try {
       const topLevelGoto = await headless.session.goto(target.url, { timeoutMs: NAV_TIMEOUT_MS });
+      if (topLevelGoto.status === 404) {
+        return { ok: false, finalStatus: "NOT_SENDABLE", errorStep: "CONTACT_PAGE_NOT_FOUND" };
+      }
       const topBlockCheck = await this.checkBlocked(headless.session, topLevelGoto.status);
       if (topBlockCheck.blocked) {
         return {
@@ -522,6 +525,9 @@ export class RunOrchestrator {
       }
 
       const contactGoto = await headless.session.goto(contactPageUrl, { timeoutMs: NAV_TIMEOUT_MS });
+      if (contactGoto.status === 404) {
+        return { ok: false, finalStatus: "NOT_SENDABLE", errorStep: "CONTACT_PAGE_NOT_FOUND" };
+      }
       const contactBlockCheck = await this.checkBlocked(headless.session, contactGoto.status);
       if (contactBlockCheck.blocked) {
         return {

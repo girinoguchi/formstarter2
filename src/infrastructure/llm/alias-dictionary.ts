@@ -94,6 +94,11 @@ export const ALIAS_RULES: readonly AliasRule[] = [
   },
   {
     category: "CONSENT_CHECKBOX",
-    patterns: [/個人情報/, /プライバシー/, /privacy[\s-]*policy/i, /利用規約/, /\bagree\b/i, /\bconsent\b/i],
+    // 「個人情報の収集について〜同意する」のように、プライバシーポリシーへの言及が
+    // チェックボックス自体のlabelではなく直前の別要素（<label>で紐付いていない説明文）に
+    // あり、チェックボックス自身のlabelは「同意する」だけというケースがある
+    // (amami-tourism.org等の実データで確認、個人情報/プライバシー等のパターンに
+    // 一致せずUNKNOWNのままチェックされない実バグがあった)。素の「同意」も見る。
+    patterns: [/個人情報/, /プライバシー/, /privacy[\s-]*policy/i, /利用規約/, /\bagree\b/i, /\bconsent\b/i, /同意/],
   },
 ];
