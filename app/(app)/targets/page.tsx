@@ -193,11 +193,9 @@ export default function TargetsPage() {
                 }}
               />
             )}
-            {isAdmin && (
-              <Button variant="outline" className="text-destructive hover:bg-destructive/10" onClick={handleResetAll}>
-                全件リセット
-              </Button>
-            )}
+            <Button variant="outline" className="text-destructive hover:bg-destructive/10" onClick={handleResetAll}>
+              全件リセット
+            </Button>
           </div>
 
           <p className="text-xs text-muted-foreground">
