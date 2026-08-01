@@ -224,7 +224,11 @@ export default function TargetsPage() {
             <span className="text-muted-foreground">→</span>
             <HowToStep n={2} title="自動で探索" desc="ウィンドウは開かず裏で確認" />
             <span className="text-muted-foreground">→</span>
-            <HowToStep n={3} title="「入力」を押す" desc="「送信可能」になった行だけ押せます" />
+            <HowToStep
+              n={3}
+              title="「入力」を押す"
+              desc="「送信可能」な行のみ。1件ずつでも「まとめて開く」で件数指定でも"
+            />
             <span className="text-muted-foreground">→</span>
             <HowToStep n={4} title="送信" desc="開いたタブで内容確認して送信" />
           </div>
