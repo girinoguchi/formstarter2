@@ -12,6 +12,7 @@ enum TargetStatus {
   RUNNING
   READY
   AWAITING_SEND
+  SENT
   NEEDS_REVIEW
   BLOCKED
   NOT_SENDABLE
@@ -30,6 +31,7 @@ enum RunStatus {
   REACHED_CONFIRMATION
   READY
   AWAITING_SEND
+  SENT
   NEEDS_REVIEW
   BLOCKED
   NOT_SENDABLE
@@ -123,6 +125,9 @@ model Run {
   // AWAITING_SEND等でタブを開いたままにしたRunが、人間に実際にタブを閉じられた時刻。
   // 「開いているタブ」一覧はこれがnullのものだけを表示する。
   closedAt             DateTime?
+  // 送信完了ページ（サンクスページ）への遷移を自動検知した時刻。検知できたらSENTへ
+  // 遷移する（送信ボタン自体はこのアプリからは絶対にクリックしない——あくまで観測のみ）。
+  sentAt               DateTime?
   screenshots          Screenshot[]
   logs                 RunLog[]
   fieldClassifications RunFieldClassification[]

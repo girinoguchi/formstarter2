@@ -13,6 +13,7 @@ import { StaticFormChecker } from "../infrastructure/crawler/static-form-checker
 import { HeuristicConfirmationPageDetector } from "../infrastructure/form/confirmation-page-detector";
 import { DomFormParser } from "../infrastructure/form/dom-form-parser";
 import { PlaywrightFormFiller } from "../infrastructure/form/form-filler";
+import { HeuristicSentPageDetector } from "../infrastructure/form/sent-page-detector";
 import { DomValidationErrorParser } from "../infrastructure/form/validation-error-parser";
 import { RuleBasedFieldClassifier } from "../infrastructure/llm/rule-based-classifier";
 import { PrismaProfileRepository } from "../infrastructure/persistence/prisma-profile-repository";
@@ -41,6 +42,7 @@ const fieldClassifier = new RuleBasedFieldClassifier();
 const formFiller = new PlaywrightFormFiller();
 const validationErrorParser = new DomValidationErrorParser();
 const confirmationPageDetector = new HeuristicConfirmationPageDetector();
+const sentPageDetector = new HeuristicSentPageDetector();
 const runOrchestrator = new RunOrchestrator(
   headedSessionFactory,
   headlessSessionFactory,
@@ -56,6 +58,7 @@ const runOrchestrator = new RunOrchestrator(
   profileRepository,
   validationErrorParser,
   confirmationPageDetector,
+  sentPageDetector,
 );
 // FILL（可視タブでの入力）は一覧の行ボタンから1件ずつ手動で開始する方式のため、
 // 自動でキューへ投入するプールは持たない（勝手にタブが増えていく体験を避けるため）。

@@ -17,6 +17,7 @@ const STATUS_CLASS: Record<string, string> = {
   REACHED_CONFIRMATION: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   READY: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
   AWAITING_SEND: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  SENT: "bg-green-600/15 text-green-700 dark:text-green-400",
   NEEDS_REVIEW: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
 };
 

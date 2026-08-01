@@ -16,6 +16,7 @@ export type RunUpdatablePatch = Partial<
     | "startedAt"
     | "finishedAt"
     | "closedAt"
+    | "sentAt"
   >
 >;
 
@@ -56,6 +57,8 @@ export interface RunRepository {
   updateStatus(runId: string, status: RunStatus, patch?: RunUpdatablePatch): Promise<void>;
   /** 人間がタブを閉じたことを記録する。「開いているタブ」一覧はこの時刻以降表示しなくなる。 */
   markClosed(runId: string): Promise<void>;
+  /** 送信完了ページへの遷移を自動検知したことを記録し、statusをSENTへ進める（Runのみ）。 */
+  markSent(runId: string): Promise<void>;
   appendLog(
     runId: string,
     level: LogLevel,

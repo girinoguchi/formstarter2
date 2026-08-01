@@ -97,4 +97,18 @@ export class PlaywrightBrowserPage implements BrowserSession {
     // 解決してしまう」——「開いているタブ」一覧が実際より早く空になる不具合になる。
     await this.page.waitForEvent("close", { timeout: 0 });
   }
+
+  onNavigation(callback: (info: { url: string; title: string; bodyText: string }) => void): void {
+    this.page.on("load", () => {
+      void (async () => {
+        try {
+          const title = await this.page.title();
+          const bodyText = await this.page.evaluate(() => document.body?.innerText?.slice(0, 2000) ?? "");
+          callback({ url: this.page.url(), title, bodyText });
+        } catch {
+          // ページが閉じられた直後/遷移中の競合等は無視する（観測用途のため取りこぼしを許容する）。
+        }
+      })();
+    });
+  }
 }

@@ -20,6 +20,7 @@ import type { ValidationErrorParser } from "../domain/ports/validation-error-par
 import { CONTEXT_KEPT_OPEN_RUN_STATUSES, type RunStatus } from "../domain/value-objects/run-status";
 import { CONTACT_PAGE_CONFIDENCE_THRESHOLD } from "../config/constants";
 import type { StaticFormChecker } from "../domain/ports/static-form-checker.port";
+import type { SentPageDetector } from "../domain/ports/sent-page-detector.port";
 import type { RunKind } from "../domain/value-objects/run-kind";
 
 const MAX_VALIDATION_RETRY_ATTEMPTS = 2;
@@ -72,6 +73,7 @@ export class RunOrchestrator {
     private readonly profileRepository: ProfileRepository,
     private readonly validationErrorParser: ValidationErrorParser,
     private readonly confirmationPageDetector: ConfirmationPageDetector,
+    private readonly sentPageDetector: SentPageDetector,
   ) {}
 
   /** CSVインポート後のExplorePool用/UIの「探索」用: Run行の作成まで待ち、あとはバックグラウンドで継続する。 */
@@ -376,6 +378,26 @@ export class RunOrchestrator {
       // AWAITING_SEND/NEEDS_REVIEW/BLOCKED/NOT_SENDABLE はタブを開いたまま残し、
       // 人間が内容を確認できるようにする。FAILEDのみ即座に閉じる。
       if (CONTEXT_KEPT_OPEN_RUN_STATUSES.includes(finalStatus)) {
+        if (finalStatus === "AWAITING_SEND") {
+          // 人間が実際に送信ボタンを押した後に表示される「送信完了ページ」への遷移を
+          // 観測するだけのリスナー——このアプリ自身が送信ボタンを押すことは絶対にない。
+          acquired.session.onNavigation((info) => {
+            if (!this.sentPageDetector.isSentConfirmationPage(info)) return;
+            void this.runRepository.markSent(run.id).catch((error: unknown) => {
+              console.error(`[RunOrchestrator] markSent failed for run ${run.id}:`, error);
+            });
+            void this.targetRepository.updateStatus(target.id, "SENT").catch((error: unknown) => {
+              console.error(`[RunOrchestrator] target status SENT failed for run ${run.id}:`, error);
+            });
+            void this.runRepository.appendLog(
+              run.id,
+              "INFO",
+              "SENT_DETECTED",
+              `送信完了ページへの遷移を検知しました: ${info.url}`,
+            );
+          });
+        }
+
         // 人間が実際にタブを閉じたら「開いているタブ」一覧から消えるようにclosedAtを記録する。
         // execute()はfillToCompletion()をfire-and-forgetしているため、ここでawaitせず
         // バックグラウンドで待っても誰もブロックしない（HTTPレスポンス等には影響しない）。

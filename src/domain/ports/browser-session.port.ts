@@ -31,4 +31,10 @@ export interface BrowserSession {
   close(): Promise<void>;
   /** 人間がこのタブ（ウィンドウ）を閉じるまで待つ。「開いているタブ」一覧から消すタイミングに使う。 */
   waitForClose(): Promise<void>;
+  /**
+   * ページ遷移（フルナビゲーション）のたびに、遷移後のURL/タイトル/本文を渡してcallbackを呼ぶ。
+   * 人間が送信ボタンを押した後の「送信完了ページ」への遷移を観測するためだけに使う
+   * ——このコールバックから能動的に何かを操作することはない。
+   */
+  onNavigation(callback: (info: { url: string; title: string; bodyText: string }) => void): void;
 }

@@ -29,6 +29,7 @@ function toDomain(row: PrismaRun): Run {
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
     closedAt: row.closedAt,
+    sentAt: row.sentAt,
     createdAt: row.createdAt,
   };
 }
@@ -47,6 +48,13 @@ export class PrismaRunRepository implements RunRepository {
 
   async markClosed(runId: string): Promise<void> {
     await this.client.run.update({ where: { id: runId }, data: { closedAt: new Date() } });
+  }
+
+  async markSent(runId: string): Promise<void> {
+    await this.client.run.update({
+      where: { id: runId },
+      data: { status: "SENT", sentAt: new Date() },
+    });
   }
 
   async appendLog(

@@ -12,6 +12,7 @@ export const STATUS_LABELS: Record<string, string> = {
   REACHED_CONFIRMATION: "確認画面到達",
   READY: "送信可能",
   AWAITING_SEND: "送信待ち",
+  SENT: "送信済み",
   NEEDS_REVIEW: "要確認",
   BLOCKED: "ブロック済み",
   NOT_SENDABLE: "送信不可",

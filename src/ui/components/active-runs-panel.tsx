@@ -34,6 +34,11 @@ export function ActiveRunsPanel({ profileId }: { profileId: string | null }) {
                   タブで送信ボタンを押し、確認できたらタブを閉じてください
                 </span>
               )}
+              {run.status === "SENT" && (
+                <span className="text-xs text-green-700 dark:text-green-400">
+                  送信完了を検知しました。内容を確認できたらタブを閉じてください
+                </span>
+              )}
             </li>
           ))}
         </ul>

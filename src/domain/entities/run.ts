@@ -14,5 +14,6 @@ export interface Run {
   startedAt: Date | null;
   finishedAt: Date | null;
   closedAt: Date | null;
+  sentAt: Date | null;
   createdAt: Date;
 }

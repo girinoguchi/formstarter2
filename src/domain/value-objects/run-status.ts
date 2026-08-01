@@ -4,6 +4,7 @@ export const TARGET_STATUSES = [
   "RUNNING",
   "READY",
   "AWAITING_SEND",
+  "SENT",
   "NEEDS_REVIEW",
   "BLOCKED",
   "NOT_SENDABLE",
@@ -24,6 +25,7 @@ export const RUN_STATUSES = [
   "REACHED_CONFIRMATION",
   "READY",
   "AWAITING_SEND",
+  "SENT",
   "NEEDS_REVIEW",
   "BLOCKED",
   "NOT_SENDABLE",
@@ -35,9 +37,12 @@ export type RunStatus = (typeof RUN_STATUSES)[number];
 /**
  * これらのステータスに到達したブラウザコンテキストは、人間がまだ操作しうるため
  * オーケストレータが意図的にクローズしない（FAILEDのみクローズする）。
+ * SENTはサンクスページ遷移を自動検知した後の状態だが、タブ自体はまだ人間が
+ * 閉じていない可能性があるため、閉じるまでは開いたままにする。
  */
 export const CONTEXT_KEPT_OPEN_RUN_STATUSES: readonly RunStatus[] = [
   "AWAITING_SEND",
+  "SENT",
   "NEEDS_REVIEW",
   "BLOCKED",
   "NOT_SENDABLE",
