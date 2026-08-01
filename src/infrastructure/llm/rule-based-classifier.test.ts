@@ -63,12 +63,11 @@ describe("RuleBasedFieldClassifier against real site fixtures", () => {
     }
   });
 
-  // ラベルが取れない(前段のdom-form-parser.test.tsで確認済み)ため、"your-adrs"という
-  // name属性だけが手がかりだが、辞書のADDRESSパターンは/住所/と/\baddress\b/のみで
-  // 省略形の"adrs"には一致しない。実際に必須項目のご住所が未入力のまま残っている
-  // ——このテストは既知のバグとして残し、辞書修正時にここを更新する。
-  it("documents a known gap: 'your-adrs' does not match any ADDRESS pattern and stays UNKNOWN", async () => {
+  // name属性の"your-adrs"は辞書のADDRESSパターン(/住所/, /\baddress\b/)に一致しないが、
+  // dom-form-parserの祖父母sibling fallbackでラベル「ご住所」が取れるようになった
+  // ことで、ラベル経由でADDRESSに分類できる（本番の必須項目未入力バグの回帰テスト）。
+  it("classifies 'your-adrs' as ADDRESS via the extracted label", async () => {
     const categories = await classifyFixture("kurashi-no-techo-contact.html");
-    expect(categories.get("your-adrs")).toBe("UNKNOWN");
+    expect(categories.get("your-adrs")).toBe("ADDRESS");
   });
 });

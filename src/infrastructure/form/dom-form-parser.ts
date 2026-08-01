@@ -86,10 +86,16 @@ export function extractFormsInCurrentDocument(): ExtractedForm[] {
     // 「inputの親要素」の直前の兄弟（前のtd/dt等）に書かれている。<label>タグも
     // aria属性も無いため、これが無いとお名前・メール等の基本項目まで
     // UNKNOWNになってしまう実バグがあった（oh-ami.com等の実データで確認）。
-    const parentPrevSibling = el.parentElement?.previousElementSibling;
-    const siblingText = parentPrevSibling?.textContent?.trim();
-    if (siblingText && !parentPrevSibling?.querySelector("input, select, textarea")) {
-      return siblingText.slice(0, 200);
+    // Contact Form 7の<p class="ttl">見出し</p><p class="cnt"><span><input></span></p>
+    // のような3階層構造では、ラベルは「親の兄弟」ではなく「祖父母の兄弟」にある
+    // （kurashi-no-techo.co.jp等の実データで確認、ご住所欄がUNKNOWNのままになる
+    // 実バグがあった）。親→祖父母の順で試し、最初に見つかった候補を使う。
+    for (const ancestor of [el.parentElement, el.parentElement?.parentElement]) {
+      const prevSibling = ancestor?.previousElementSibling;
+      const text = prevSibling?.textContent?.trim();
+      if (text && !prevSibling?.querySelector("input, select, textarea")) {
+        return text.slice(0, 200);
+      }
     }
 
     // 同意チェックボックスなど、<label>で明示的に紐付けられていないケース

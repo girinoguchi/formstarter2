@@ -81,12 +81,11 @@ describe("extractFormsInCurrentDocument", () => {
       expect(subject?.options?.length).toBeGreaterThanOrEqual(8);
     });
 
-    it("does NOT associate the <p class=\"ttl\"> heading as a label (documents current limitation)", () => {
-      // p.ttl(見出し) と p.cnt(input) は input の「親のさらに親」の兄弟にあたり、
-      // 現状のsiblingフォールバックは「親の直前の兄弟」までしか見ないため、
-      // ここでは名前・住所等の見出しテキストは拾えない。name属性の辞書一致だけで
-      // 分類できているのが実情——このテストは将来ラベル抽出を強化する際の比較対象になる。
-      expect(fieldByName(fields, "your-adrs")?.label).toBeNull();
+    it("associates the <p class=\"ttl\"> heading as a label via the grandparent-sibling fallback", () => {
+      // p.ttl(見出し) と p.cnt(input) は input の「親のさらに親」の兄弟にあたる。
+      // 親の直前の兄弟だけを見るfallbackでは拾えず、ご住所欄がUNKNOWNのまま
+      // 未入力になる実バグがあった（kurashi-no-techo.co.jp本番データで確認）。
+      expect(fieldByName(fields, "your-adrs")?.label).toContain("ご住所");
     });
   });
 });
