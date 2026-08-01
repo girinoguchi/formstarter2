@@ -224,7 +224,7 @@ export default function TargetsPage() {
             <HowToStep n={2} title="自動で探索" desc="ウィンドウは開かず裏で確認" />
             <HowToStep
               n={3}
-              title="「入力」を押す、あるいは「まとめて開く」セクションから複数まとめて開く"
+              title="「開く」を押す、あるいは「まとめて開く」セクションから複数まとめて開く"
               desc="「送信可能」になった行のみ操作できます"
             />
             <HowToStep n={4} title="送信" desc="開いたタブで内容確認して送信" />
@@ -316,7 +316,7 @@ export default function TargetsPage() {
         </div>
       </div>
       <p className="mb-4 text-xs text-muted-foreground">
-        表示順は取り込んだ順です。フォーム探索の結果・スコア・理由は「詳細」で確認できます。「送信可能」になった行の「入力」を押すと、その場でタブが開いて入力された状態を確認できます。
+        表示順は取り込んだ順です。フォーム探索の結果・スコア・理由は「詳細」で確認できます。「送信可能」になった行の「開く」を押すと、その場でタブが開いて入力された状態を確認できます。
       </p>
 
       {isLoading && <p className="text-sm text-muted-foreground">読み込み中...</p>}

@@ -85,7 +85,7 @@ export function TargetTable({ targets }: TargetTableProps) {
                 onClick={() => handleRunOne(target.id)}
                 disabled={runningId === target.id || RUNNING_LIKE_STATUSES.has(target.status)}
               >
-                {target.contactPageUrl ? "入力" : target.status === "PENDING" ? "探索" : "再探索"}
+                {target.contactPageUrl ? "開く" : target.status === "PENDING" ? "探索" : "再探索"}
               </Button>
             </TableCell>
             <TableCell>
