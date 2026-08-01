@@ -29,4 +29,6 @@ export interface BrowserSession {
 
   screenshot(): Promise<Buffer>;
   close(): Promise<void>;
+  /** 人間がこのタブ（ウィンドウ）を閉じるまで待つ。「開いているタブ」一覧から消すタイミングに使う。 */
+  waitForClose(): Promise<void>;
 }

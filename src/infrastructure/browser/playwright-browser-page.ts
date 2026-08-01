@@ -89,4 +89,12 @@ export class PlaywrightBrowserPage implements BrowserSession {
   async close(): Promise<void> {
     await this.page.close();
   }
+
+  async waitForClose(): Promise<void> {
+    if (this.page.isClosed()) return;
+    // Playwrightのwaits系メソッドは既定で約30秒のタイムアウトを持つため、
+    // timeout: 0（無制限）を明示しないと「タブがまだ開いているのにタイムアウトで
+    // 解決してしまう」——「開いているタブ」一覧が実際より早く空になる不具合になる。
+    await this.page.waitForEvent("close", { timeout: 0 });
+  }
 }

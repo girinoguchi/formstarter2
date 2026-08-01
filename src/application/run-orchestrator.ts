@@ -374,9 +374,18 @@ export class RunOrchestrator {
       await this.targetRepository.updateStatus(target.id, finalStatus);
     } finally {
       // AWAITING_SEND/NEEDS_REVIEW/BLOCKED/NOT_SENDABLE はタブを開いたまま残し、
-      // 人間が内容を確認できるようにする（FILLは1件ずつ手動起動のため、キュー消化待ちの
-      // ための後始末は不要——単に閉じずに関数を抜けるだけでよい）。FAILEDのみ即座に閉じる。
-      if (!CONTEXT_KEPT_OPEN_RUN_STATUSES.includes(finalStatus)) {
+      // 人間が内容を確認できるようにする。FAILEDのみ即座に閉じる。
+      if (CONTEXT_KEPT_OPEN_RUN_STATUSES.includes(finalStatus)) {
+        // 人間が実際にタブを閉じたら「開いているタブ」一覧から消えるようにclosedAtを記録する。
+        // execute()はfillToCompletion()をfire-and-forgetしているため、ここでawaitせず
+        // バックグラウンドで待っても誰もブロックしない（HTTPレスポンス等には影響しない）。
+        void acquired.session
+          .waitForClose()
+          .then(() => this.runRepository.markClosed(run.id))
+          .catch((error: unknown) => {
+            console.error(`[RunOrchestrator] waitForClose failed for run ${run.id}:`, error);
+          });
+      } else {
         await acquired.release();
       }
     }

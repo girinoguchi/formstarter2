@@ -13,5 +13,6 @@ export interface Run {
   errorMessage: string | null;
   startedAt: Date | null;
   finishedAt: Date | null;
+  closedAt: Date | null;
   createdAt: Date;
 }

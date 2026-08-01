@@ -28,6 +28,7 @@ function toDomain(row: PrismaRun): Run {
     errorMessage: row.errorMessage,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
+    closedAt: row.closedAt,
     createdAt: row.createdAt,
   };
 }
@@ -42,6 +43,10 @@ export class PrismaRunRepository implements RunRepository {
 
   async updateStatus(runId: string, status: RunStatus, patch?: RunUpdatablePatch): Promise<void> {
     await this.client.run.update({ where: { id: runId }, data: { status, ...(patch ?? {}) } });
+  }
+
+  async markClosed(runId: string): Promise<void> {
+    await this.client.run.update({ where: { id: runId }, data: { closedAt: new Date() } });
   }
 
   async appendLog(
@@ -121,9 +126,16 @@ export class PrismaRunRepository implements RunRepository {
     // 意味がない。EXPLOREは可視タブを持たないため、NOT_SENDABLE等の終端statusをここに含めると
     // 「探索が終わって送信不可になっただけ」のRunまで「探索中」と誤表示してしまう
     // ——EXPLOREはfinishedAtがnull（＝本当にまだ進行中）のものだけを対象にする。
+    // closedAtは人間が実際にタブを閉じた時刻。まだ閉じられていない（closedAt: null）ものだけを
+    // 「開いているタブ」として扱う——閉じられたら一覧から自動的に消える。
     const activeCondition =
       filter?.kind === "FILL"
-        ? { OR: [{ finishedAt: null }, { status: { in: [...CONTEXT_KEPT_OPEN_RUN_STATUSES] } }] }
+        ? {
+            OR: [
+              { finishedAt: null },
+              { status: { in: [...CONTEXT_KEPT_OPEN_RUN_STATUSES] }, closedAt: null },
+            ],
+          }
         : { finishedAt: null };
 
     const rows = await this.client.run.findMany({
