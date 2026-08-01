@@ -201,7 +201,7 @@ export default function TargetsPage() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            CSV: 1行1URL、またはカンマ・タブ区切り。UTF-8で保存。取込むと選択中のプロジェクトに追加されます。
+            CSV: 1行1URL、またはカンマ・タブ区切り。UTF-8で保存。取込むと選択中のプロジェクトの既存データは削除され、新しいCSVの内容に置き換わります。
           </p>
           {importMessage && <p className="text-xs text-muted-foreground">{importMessage}</p>}
           {importBatches && importBatches.length > 0 && (

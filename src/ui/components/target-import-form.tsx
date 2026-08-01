@@ -20,6 +20,11 @@ export function TargetImportForm({
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (!confirm("現在取り込み済みのデータは削除され、この新しいCSVの内容に置き換わります。よろしいですか？")) {
+      event.target.value = "";
+      return;
+    }
+
     const result = await importCsv.mutateAsync({ file, profileId });
     onImported({ fileName: file.name, ...result });
     event.target.value = "";
