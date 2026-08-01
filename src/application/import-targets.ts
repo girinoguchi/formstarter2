@@ -18,6 +18,10 @@ export class CsvImportService {
       return { importedCount: 0, skippedLineCount, targets: [] };
     }
 
+    // 新しいCSVを取り込むたびに、そのプロフィールの既存ターゲットを一度クリアする。
+    // 古い取り込み結果が残ったままだと「フォーム発見率」に前回分が混ざってしまうため。
+    await this.targetRepository.removeAllForProfile(profileId);
+
     const importBatchId = await this.targetRepository.createImportBatch(fileName);
     const targets = await this.targetRepository.createMany(
       rows.map((row) => ({ url: row.url, companyName: row.companyName, importBatchId, profileId })),
