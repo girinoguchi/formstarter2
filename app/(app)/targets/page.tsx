@@ -53,6 +53,9 @@ export default function TargetsPage() {
     search: search || undefined,
     status: statusFilter || undefined,
   });
+  // フォーム発見率は検索/ステータス絞り込みの影響を受けないプロジェクト全体の指標にしたいため、
+  // 表示用の一覧とは別に絞り込み無しで取得する（絞り込み無しの場合は同一クエリとしてキャッシュ共有される）。
+  const { data: allTargets } = useTargets({ profileId });
 
   const [page, setPage] = useState(1);
   const filterKey = `${profileId ?? ""}:${search}:${statusFilter}`;
@@ -125,6 +128,13 @@ export default function TargetsPage() {
   }
 
   const failedCount = targets?.filter((t) => FAILED_LIKE_STATUSES.has(t.status)).length ?? 0;
+
+  // フォーム発見率＝送信可能なフォームが見つかった件数(contactPageUrlが確定した件数)/総件数。
+  // ステータスだけで判定すると探索と入力どちらの失敗か曖昧になるため、EXPLOREで
+  // フォームが見つかった時点で確定するcontactPageUrlの有無を直接の判定材料にする。
+  const discoveredCount = allTargets?.filter((t) => t.contactPageUrl !== null).length ?? 0;
+  const totalCount = allTargets?.length ?? 0;
+  const discoveryRate = totalCount > 0 ? ((discoveredCount / totalCount) * 100).toFixed(1) : null;
 
   if (profiles && profiles.length === 0) {
     return (
@@ -245,6 +255,18 @@ export default function TargetsPage() {
           </p>
         </CardContent>
       </Card>
+
+      {discoveryRate !== null && (
+        <Card className="mb-6">
+          <CardContent>
+            <p className="text-xs text-muted-foreground">フォーム発見率（送信可能件数/総件数）</p>
+            <p className="text-2xl font-semibold tabular-nums">{discoveryRate}%</p>
+            <p className="text-xs text-muted-foreground tabular-nums">
+              {discoveredCount}/{totalCount}件
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <ExploringIndicator profileId={profileId} />
       <ActiveRunsPanel profileId={profileId} />
