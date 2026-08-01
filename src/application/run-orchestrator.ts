@@ -420,34 +420,23 @@ export class RunOrchestrator {
       // 人間が内容を確認できるようにする。FAILEDのみ即座に閉じる。
       if (CONTEXT_KEPT_OPEN_RUN_STATUSES.includes(finalStatus)) {
         if (finalStatus === "AWAITING_SEND") {
-          // 人間が実際に送信ボタンを押した後に表示される「送信完了ページ」への遷移を
-          // 観測するだけのリスナー——このアプリ自身が送信ボタンを押すことは絶対にない。
-          acquired.session.onNavigation((info) => {
-            if (!this.sentPageDetector.isSentConfirmationPage(info)) return;
-            void this.runRepository.markSent(run.id).catch((error: unknown) => {
-              console.error(`[RunOrchestrator] markSent failed for run ${run.id}:`, error);
+          // Cloudflare Turnstile等のBot対策がCDP接続の存在自体を検知し、人間が手動で
+          // チェックしても検証失敗させるケースを確認したため、人間が最終操作（Turnstile
+          // 解決・送信）をする直前でPlaywright側の接続を切り離す（タブ自体は残る）。
+          // 以降はCDP経由での「送信完了ページへの自動遷移検知」ができなくなるため、
+          // 人間がUIの「送信した」ボタンを押すことでmarkSent/markClosedする運用にしている。
+          await acquired.detach();
+        } else {
+          // 人間が実際にタブを閉じたら「開いているタブ」一覧から消えるようにclosedAtを記録する。
+          // execute()はfillToCompletion()をfire-and-forgetしているため、ここでawaitせず
+          // バックグラウンドで待っても誰もブロックしない（HTTPレスポンス等には影響しない）。
+          void acquired.session
+            .waitForClose()
+            .then(() => this.runRepository.markClosed(run.id))
+            .catch((error: unknown) => {
+              console.error(`[RunOrchestrator] waitForClose failed for run ${run.id}:`, error);
             });
-            void this.targetRepository.updateStatus(target.id, "SENT").catch((error: unknown) => {
-              console.error(`[RunOrchestrator] target status SENT failed for run ${run.id}:`, error);
-            });
-            void this.runRepository.appendLog(
-              run.id,
-              "INFO",
-              "SENT_DETECTED",
-              `送信完了ページへの遷移を検知しました: ${info.url}`,
-            );
-          });
         }
-
-        // 人間が実際にタブを閉じたら「開いているタブ」一覧から消えるようにclosedAtを記録する。
-        // execute()はfillToCompletion()をfire-and-forgetしているため、ここでawaitせず
-        // バックグラウンドで待っても誰もブロックしない（HTTPレスポンス等には影響しない）。
-        void acquired.session
-          .waitForClose()
-          .then(() => this.runRepository.markClosed(run.id))
-          .catch((error: unknown) => {
-            console.error(`[RunOrchestrator] waitForClose failed for run ${run.id}:`, error);
-          });
       } else {
         await acquired.release();
       }
