@@ -6,12 +6,13 @@ import type { StaticFormChecker as StaticFormCheckerPort } from "../../domain/po
 const FILLABLE_INPUT_SELECTOR =
   'input[type="text"], input[type="email"], input[type="tel"], input:not([type]), textarea';
 
-// run-orchestrator.tsのlooksLikeContactForm/scoreFormと同じ判定基準
-// （氏名/メールらしき項目があるか、3項目以上あるか）。サイト内検索・
-// ニュースレター購読フォーム等をここで弾かないと、フォームタグが1件
-// あるというだけでREADYになってしまう実バグがあった。
-const EMAIL_PATTERN = /email|mail|メール/i;
-const NAME_PATTERN = /name|氏名|お名前|担当者/i;
+// run-orchestrator.tsのlooksLikeContactFormと同じ判定基準。素の"mail"/"name"は
+// "mailmagazine"/"newsletter_mail"/"campaign_name"/"file_name"/"username"のような
+// 無関係なフィールド名まで拾ってしまうため使わず、曖昧さの少ない言い回しのみ見る。
+// 項目数(3件以上)によるフォールバックも、検索フォーム(キーワード+カテゴリ+価格帯)や
+// ログインフォームまで通してしまうため、textarea(本文入力欄)の有無に置き換えた。
+const EMAIL_PATTERN = /メールアドレス|メール|e-?mail/i;
+const NAME_PATTERN = /氏名|お名前|担当者|full[\s-]*name|your[\s-]*name/i;
 
 /**
  * fetch + Cheerio のみで「このページに入力可能な“問い合わせフォームらしい”フォームが
@@ -22,7 +23,7 @@ const NAME_PATTERN = /name|氏名|お名前|担当者/i;
 export function looksLikeContactForm($: cheerio.CheerioAPI, form: AnyNode): boolean {
   const fields = $(form).find(FILLABLE_INPUT_SELECTOR).toArray();
   if (fields.length === 0) return false;
-  if (fields.length >= 3) return true;
+  if (fields.some((field) => $(field).is("textarea"))) return true;
 
   const hints = fields
     .map((field) => {

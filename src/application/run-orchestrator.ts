@@ -663,22 +663,37 @@ function computeFormSignatureHash(form: ParsedForm): string {
   return createHash("sha1").update(signature).digest("hex").slice(0, 16);
 }
 
+// looksLikeContactForm専用の、より曖昧さの少ないパターン。scoreForm用のEMAIL_PATTERN/
+// NAME_OR_LABEL_NAME_PATTERNは素の"mail"/"name"も拾うが、それだと検索フォームの
+// keyword項目名"campaign_name"や"file_name"、購読フォームの"mailmagazine"
+// "newsletter_mail"のような無関係なフィールド名まで「問い合わせフォームらしい」
+// 根拠にしてしまう。READY判定はFILL時の複数フォーム中からの選別より慎重にすべき
+// なので、より特定的な言い回しだけを見る。
+const CONTACT_EMAIL_HINT_PATTERN = /メールアドレス|メール|e-?mail/i;
+const CONTACT_NAME_HINT_PATTERN = /氏名|お名前|担当者|full[\s-]*name|your[\s-]*name/i;
+
 /**
  * サイト内検索・ニュースレター購読等、明らかに問い合わせ用途ではないフォームを
  * EXPLOREのREADY判定から除外する最低限のフィルタ。<form>タグの存在だけでは
  * ヘッダー/フッター共通部品の検索フォーム等を誤って問い合わせフォームと
  * 判定してしまう実バグがあった（kirin.co.jp/recolte-jp.com等の実データで確認）。
- * 氏名/メールいずれかの項目があるか、3項目以上あれば「らしい」とみなす
- * （scoreFormの加点基準と揃えている）。
+ * 単純な項目数(3件以上)によるフォールバックは、検索フォーム(キーワード+カテゴリ+
+ * 価格帯)やログインフォーム(ID+パスワード+ログイン保持)まで通してしまうため、
+ * 氏名/メールらしき項目があるか、本文入力欄(textarea、問い合わせ内容欄の
+ * 強いシグナル)があるかで判定する。
  */
 function looksLikeContactForm(form: ParsedForm): boolean {
   const hasEmail = form.fields.some(
-    (f) => f.type === "email" || EMAIL_PATTERN.test(f.name ?? "") || EMAIL_PATTERN.test(f.label ?? ""),
+    (f) =>
+      f.type === "email" ||
+      CONTACT_EMAIL_HINT_PATTERN.test(f.name ?? "") ||
+      CONTACT_EMAIL_HINT_PATTERN.test(f.label ?? ""),
   );
   const hasName = form.fields.some(
-    (f) => NAME_OR_LABEL_NAME_PATTERN.test(f.label ?? "") || NAME_OR_LABEL_NAME_PATTERN.test(f.name ?? ""),
+    (f) => CONTACT_NAME_HINT_PATTERN.test(f.label ?? "") || CONTACT_NAME_HINT_PATTERN.test(f.name ?? ""),
   );
-  return hasEmail || hasName || form.fields.length >= 3;
+  const hasTextarea = form.fields.some((f) => f.type === "textarea");
+  return hasEmail || hasName || hasTextarea;
 }
 
 function scoreForm(form: ParsedForm): number {
