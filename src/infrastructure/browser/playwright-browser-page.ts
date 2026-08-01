@@ -74,8 +74,8 @@ export class PlaywrightBrowserPage implements BrowserSession {
     await this.resolveTarget(options?.frameUrl).click(selector);
   }
 
-  async isVisible(selector: string): Promise<boolean> {
-    return this.page.isVisible(selector);
+  async isVisible(selector: string, options?: { frameUrl?: string }): Promise<boolean> {
+    return this.resolveTarget(options?.frameUrl).isVisible(selector);
   }
 
   async textContent(selector: string): Promise<string | null> {

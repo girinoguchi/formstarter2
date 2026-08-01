@@ -101,10 +101,11 @@ export class PlaywrightFormFiller implements FormFiller {
       try {
         if (classification.category === "CONSENT_CHECKBOX") {
           if (field.type === "checkbox" && profile.consentPolicy) {
-            await session.check(field.selector, {
-              timeoutMs: FIELD_FILL_TIMEOUT_MS,
-              frameUrl: field.frameUrl ?? undefined,
-            });
+            const frameUrl = field.frameUrl ?? undefined;
+            if (!(await session.isVisible(field.selector, { frameUrl }))) {
+              throw new Error(`要素が非表示のためスキップしました: ${field.selector}`);
+            }
+            await session.check(field.selector, { timeoutMs: FIELD_FILL_TIMEOUT_MS, frameUrl });
           }
           continue;
         }
@@ -132,6 +133,15 @@ export class PlaywrightFormFiller implements FormFiller {
 
   private async fillOne(session: BrowserSession, field: ParsedFormField, value: string): Promise<void> {
     const frameUrl = field.frameUrl ?? undefined;
+
+    // 非表示要素（レスポンシブ対応の重複フィールドや、他の選択肢用に隠れている
+    // 条件付きフィールド等）に通常のfill()等を試みると、要素が見えるようになるまで
+    // タイムアウト分待ってから失敗する。事前に可視性を見ておけば即座にスキップでき、
+    // 無関係な非表示フィールドが何十件もあるフォーム（CF7の条件分岐等）で
+    // 待ち時間が積み上がるのを防げる。
+    if (!(await session.isVisible(field.selector, { frameUrl }))) {
+      throw new Error(`要素が非表示のためスキップしました: ${field.selector}`);
+    }
 
     if (TEXT_LIKE_FIELD_TYPES.includes(field.type)) {
       await session.fill(field.selector, value, { timeoutMs: FIELD_FILL_TIMEOUT_MS, frameUrl });

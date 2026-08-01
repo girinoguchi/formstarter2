@@ -24,7 +24,7 @@ export interface BrowserSession {
     options?: { timeoutMs?: number; frameUrl?: string },
   ): Promise<void>;
   click(selector: string, options?: { frameUrl?: string }): Promise<void>;
-  isVisible(selector: string): Promise<boolean>;
+  isVisible(selector: string, options?: { frameUrl?: string }): Promise<boolean>;
   textContent(selector: string): Promise<string | null>;
 
   screenshot(): Promise<Buffer>;
