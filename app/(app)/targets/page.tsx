@@ -224,8 +224,8 @@ export default function TargetsPage() {
             <HowToStep n={2} title="自動で探索" desc="ウィンドウは開かず裏で確認" />
             <HowToStep
               n={3}
-              title="「入力」を押す"
-              desc="「送信可能」になった行のみ操作できます。1件ずつでも、まとめて開くボタンで複数件を一度に開くこともできます"
+              title="「入力」を押す、あるいは「まとめて開く」セクションから複数まとめて開く"
+              desc="「送信可能」になった行のみ操作できます"
             />
             <HowToStep n={4} title="送信" desc="開いたタブで内容確認して送信" />
           </div>
