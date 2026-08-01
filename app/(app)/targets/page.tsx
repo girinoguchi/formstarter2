@@ -182,15 +182,6 @@ export default function TargetsPage() {
                   <li key={batch.id} className="flex flex-wrap items-center gap-2 text-xs">
                     <Badge variant="secondary">{batch.fileName}</Badge>
                     <span className="text-muted-foreground">{batch.targetCount}件</span>
-                    <span className="text-muted-foreground">
-                      {new Date(batch.importedAt).toLocaleString("ja-JP", {
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
                   </li>
                 ))}
               </ul>
