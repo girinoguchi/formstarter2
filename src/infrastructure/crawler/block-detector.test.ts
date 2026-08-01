@@ -37,4 +37,17 @@ describe("HeuristicBlockDetector", () => {
     });
     expect(result.blocked).toBe(false);
   });
+
+  // "captcha"を素の部分文字列として使うと"reCAPTCHA"の可視バッジ/注意書きに
+  // マッチしてしまい、Google reCAPTCHAを埋め込んだだけの正常なフォームまで
+  // BOT_PROTECTIONと誤判定する実バグがあった（seicho-inc.jp等の実データで確認）。
+  it("does not flag an ordinary form that merely embeds Google reCAPTCHA", () => {
+    const result = detector.check({
+      status: 200,
+      title: "お問い合わせフォーム",
+      bodyText:
+        "このサイトはreCAPTCHAによって保護されており、Googleのプライバシーポリシーと利用規約が適用されます。",
+    });
+    expect(result.blocked).toBe(false);
+  });
 });

@@ -4,8 +4,12 @@ import type { BlockCheckInput, BlockCheckResult, BlockDetector } from "../../dom
 // このステータスで返すことが多い（JS実行後にトップページへ自動遷移する構成が典型）。
 const BLOCKED_STATUS_CODES = new Set([401, 403, 429, 503]);
 
+// bare "captcha"は使わない——Google reCAPTCHAを埋め込んだだけの正常なフォームでも
+// バッジ/注意書きの可視テキストに"reCAPTCHA"が含まれ、その部分文字列として
+// マッチしてしまい大量の誤検知を招く実バグがあった（seicho-inc.jp等の実データで確認）。
+// 残りのフレーズは実際のチャレンジ/拒否ページ特有の言い回しなので誤検知しにくい。
 const BOT_PROTECTION_TEXT_PATTERN =
-  /access denied|just a moment|checking your browser|attention required|unusual traffic|are you a human|verify you are human|please verify|captcha|forbidden|rate limit/i;
+  /access denied|just a moment|checking your browser|attention required|unusual traffic|are you a human|verify you are human|please verify|forbidden|rate limit/i;
 
 /**
  * 「営業お断り」等の営業禁止文言の検知パターン。FormStarterappの実運用で磨かれた
