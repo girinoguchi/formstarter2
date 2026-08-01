@@ -177,14 +177,10 @@ export default function TargetsPage() {
           {importBatches && importBatches.length > 0 && (
             <div className="pt-2">
               <p className="mb-2 text-xs font-medium text-muted-foreground">取り込んだCSV</p>
-              <ul className="space-y-1">
-                {importBatches.map((batch) => (
-                  <li key={batch.id} className="flex flex-wrap items-center gap-2 text-xs">
-                    <Badge variant="secondary">{batch.fileName}</Badge>
-                    <span className="text-muted-foreground">{batch.targetCount}件</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <Badge variant="secondary">{importBatches[0].fileName}</Badge>
+                <span className="text-muted-foreground">{importBatches[0].targetCount}件</span>
+              </div>
             </div>
           )}
         </CardContent>
