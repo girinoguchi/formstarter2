@@ -7,10 +7,14 @@ const envSchema = z.object({
   // FILL（可視タブでの入力）は一覧の行ボタンから1件ずつ手動で開始する方式のため、
   // 並列数の上限設定を持たない（人間が押した分だけタブが開く）。
   EXPLORE_CONCURRENCY: z.coerce.number().int().positive().default(8),
+  // ログインセッション（JWT）の署名鍵。FormStarterapp同様、Sessionテーブルは持たず
+  // Cookieに署名付きJWTを入れる方式のため必須。
+  AUTH_SECRET: z.string().min(16),
 });
 
 export const env = envSchema.parse({
   DATABASE_URL: process.env.DATABASE_URL,
   FIELD_CLASSIFIER_MODEL: process.env.FIELD_CLASSIFIER_MODEL,
   EXPLORE_CONCURRENCY: process.env.EXPLORE_CONCURRENCY,
+  AUTH_SECRET: process.env.AUTH_SECRET,
 });

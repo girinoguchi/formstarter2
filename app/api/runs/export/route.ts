@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { requireAdmin } from "../../../../src/lib/auth";
 import { getCsvExportService } from "../../../../src/lib/di";
 
 export async function GET(request: NextRequest) {
+  const guard = await requireAdmin();
+  if ("response" in guard) return guard.response;
+
   const searchParams = request.nextUrl.searchParams;
   const profileId = searchParams.get("profileId") ?? undefined;
   const failedOnly = searchParams.get("failedOnly") === "1";

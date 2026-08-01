@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { requireAdmin } from "../../../src/lib/auth";
 import { getProfileRepository } from "../../../src/lib/di";
 
 export async function GET() {
@@ -8,6 +9,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const guard = await requireAdmin();
+  if ("response" in guard) return guard.response;
+
   const body = await request.json();
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name) {

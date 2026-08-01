@@ -81,7 +81,7 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-export function ProfileForm({ profileId }: { profileId: string }) {
+export function ProfileForm({ profileId, readOnly = false }: { profileId: string; readOnly?: boolean }) {
   const [form, setForm] = useState<ProfileFormState>(EMPTY_STATE);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -159,6 +159,7 @@ export function ProfileForm({ profileId }: { profileId: string }) {
       </div>
 
       <div className="p-6">
+        <fieldset disabled={readOnly} className="contents">
         {activeTab === "profile" && (
           <div className="space-y-8">
             <section className="space-y-4">
@@ -269,6 +270,7 @@ export function ProfileForm({ profileId }: { profileId: string }) {
               <Checkbox
                 id="consentPolicy"
                 checked={form.consentPolicy}
+                disabled={readOnly}
                 onCheckedChange={(checked) => set("consentPolicy", checked === true)}
               />
               <Label htmlFor="consentPolicy" className="text-xs font-normal text-gray-600">
@@ -276,7 +278,7 @@ export function ProfileForm({ profileId }: { profileId: string }) {
               </Label>
             </div>
 
-            <SaveBar isSaving={isSaving} flash={flash} onSave={handleSave} />
+            {!readOnly && <SaveBar isSaving={isSaving} flash={flash} onSave={handleSave} />}
           </div>
         )}
 
@@ -297,9 +299,10 @@ export function ProfileForm({ profileId }: { profileId: string }) {
                 placeholder={"例:\n{{company}} 担当者様\n\nはじめまして。〇〇株式会社の山田と申します。\n..."}
               />
             </Field>
-            <SaveBar isSaving={isSaving} flash={flash} onSave={handleSave} />
+            {!readOnly && <SaveBar isSaving={isSaving} flash={flash} onSave={handleSave} />}
           </div>
         )}
+        </fieldset>
       </div>
     </div>
   );

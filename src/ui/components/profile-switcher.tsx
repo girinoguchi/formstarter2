@@ -26,9 +26,11 @@ import {
 export function ProfileSwitcher({
   activeId,
   onActiveChange,
+  readOnly = false,
 }: {
   activeId: string | null;
   onActiveChange: (id: string) => void;
+  readOnly?: boolean;
 }) {
   const { data: profiles } = useProfileList();
   const activate = useActivateProfile();
@@ -85,45 +87,51 @@ export function ProfileSwitcher({
               <span className="truncate">{p.name}</span>
             </DropdownMenuItem>
           ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => {
-              setNameInput("");
-              setCreateOpen(true);
-            }}
-            className="gap-2 text-primary"
-          >
-            <Plus size={14} />
-            新規プロジェクト
-          </DropdownMenuItem>
+          {!readOnly && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => {
+                  setNameInput("");
+                  setCreateOpen(true);
+                }}
+                className="gap-2 text-primary"
+              >
+                <Plus size={14} />
+                新規プロジェクト
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <div className="flex gap-1">
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={!active}
-          onClick={() => {
-            setNameInput(active?.name ?? "");
-            setRenameOpen(true);
-          }}
-          className="gap-1.5 rounded-lg text-gray-500 hover:text-gray-700"
-        >
-          <Pencil size={14} />
-          名前を変更
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={!active}
-          onClick={() => setDeleteOpen(true)}
-          className="gap-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500"
-        >
-          <Trash2 size={14} />
-          削除
-        </Button>
-      </div>
+      {!readOnly && (
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!active}
+            onClick={() => {
+              setNameInput(active?.name ?? "");
+              setRenameOpen(true);
+            }}
+            className="gap-1.5 rounded-lg text-gray-500 hover:text-gray-700"
+          >
+            <Pencil size={14} />
+            名前を変更
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!active}
+            onClick={() => setDeleteOpen(true)}
+            className="gap-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500"
+          >
+            <Trash2 size={14} />
+            削除
+          </Button>
+        </div>
+      )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">

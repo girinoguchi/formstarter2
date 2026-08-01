@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { requireAdmin } from "../../../../src/lib/auth";
 import { getProfileRepository } from "../../../../src/lib/di";
 
 const STRING_FIELDS = [
@@ -34,6 +35,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await requireAdmin();
+  if ("response" in guard) return guard.response;
+
   const { id } = await params;
   const body = await request.json();
 
@@ -50,6 +54,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await requireAdmin();
+  if ("response" in guard) return guard.response;
+
   const { id } = await params;
   const body = await request.json();
   const name = typeof body.name === "string" ? body.name.trim() : "";
@@ -62,6 +69,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await requireAdmin();
+  if ("response" in guard) return guard.response;
+
   const { id } = await params;
   await getProfileRepository().remove(id);
   return NextResponse.json({ ok: true });

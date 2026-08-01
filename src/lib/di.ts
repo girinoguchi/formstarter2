@@ -18,6 +18,7 @@ import { RuleBasedFieldClassifier } from "../infrastructure/llm/rule-based-class
 import { PrismaProfileRepository } from "../infrastructure/persistence/prisma-profile-repository";
 import { PrismaRunRepository } from "../infrastructure/persistence/prisma-run-repository";
 import { PrismaTargetRepository } from "../infrastructure/persistence/prisma-target-repository";
+import { PrismaUserRepository } from "../infrastructure/persistence/prisma-user-repository";
 import { env } from "../config/env";
 import { prisma } from "./prisma";
 
@@ -28,6 +29,7 @@ const targetRepository = new PrismaTargetRepository(prisma);
 const csvImportService = new CsvImportService(targetRepository);
 const profileRepository = new PrismaProfileRepository(prisma);
 const runRepository = new PrismaRunRepository(prisma);
+const userRepository = new PrismaUserRepository(prisma);
 const headedSessionFactory = new PlaywrightSessionManager();
 const headlessSessionFactory = new HeadlessPlaywrightSessionManager();
 const screenshotService = new FileScreenshotService();
@@ -91,4 +93,8 @@ export function getExplorePool() {
 
 export function getCsvExportService() {
   return csvExportService;
+}
+
+export function getUserRepository() {
+  return userRepository;
 }
