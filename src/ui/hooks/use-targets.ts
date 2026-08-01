@@ -80,6 +80,7 @@ export function useImportCsv() {
     mutationFn: importCsv,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["targets"] });
+      queryClient.invalidateQueries({ queryKey: ["import-batches"] });
     },
   });
 }
@@ -120,6 +121,7 @@ export function useResetTargets() {
     mutationFn: resetTargets,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["targets"] });
+      queryClient.invalidateQueries({ queryKey: ["import-batches"] });
     },
   });
 }

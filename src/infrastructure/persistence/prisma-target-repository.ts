@@ -3,6 +3,7 @@ import type { PrismaClient, Target as PrismaTarget } from "@prisma/client";
 import type { Target } from "../../domain/entities/target";
 import type {
   CreateTargetInput,
+  ImportBatchSummary,
   TargetListFilter,
   TargetListItem,
   TargetRepository,
@@ -61,6 +62,25 @@ export class PrismaTargetRepository implements TargetRepository {
   async createImportBatch(fileName: string): Promise<string> {
     const batch = await this.client.importBatch.create({ data: { fileName } });
     return batch.id;
+  }
+
+  async listImportBatches(profileId: string): Promise<readonly ImportBatchSummary[]> {
+    const rows = await this.client.importBatch.findMany({
+      where: { targets: { some: { profileId, deletedAt: null } } },
+      orderBy: { importedAt: "desc" },
+      select: {
+        id: true,
+        fileName: true,
+        importedAt: true,
+        _count: { select: { targets: { where: { profileId, deletedAt: null } } } },
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      fileName: row.fileName,
+      importedAt: row.importedAt,
+      targetCount: row._count.targets,
+    }));
   }
 
   async createMany(targets: readonly CreateTargetInput[]): Promise<readonly Target[]> {

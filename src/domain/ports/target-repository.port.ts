@@ -20,10 +20,19 @@ export interface TargetListItem extends Target {
   latestErrorMessage: string | null;
 }
 
+/** プロジェクトごとに取り込んだCSVの履歴表示用。 */
+export interface ImportBatchSummary {
+  id: string;
+  fileName: string;
+  importedAt: Date;
+  targetCount: number;
+}
+
 export interface TargetRepository {
   findById(id: string): Promise<Target | null>;
   list(filter: TargetListFilter): Promise<readonly TargetListItem[]>;
   createImportBatch(fileName: string): Promise<string>;
+  listImportBatches(profileId: string): Promise<readonly ImportBatchSummary[]>;
   createMany(targets: readonly CreateTargetInput[]): Promise<readonly Target[]>;
   updateStatus(
     id: string,

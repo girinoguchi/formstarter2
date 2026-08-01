@@ -15,6 +15,7 @@ import { ActiveRunsPanel } from "../../../src/ui/components/active-runs-panel";
 import { ExploringIndicator } from "../../../src/ui/components/exploring-indicator";
 import { TargetImportForm } from "../../../src/ui/components/target-import-form";
 import { TargetTable } from "../../../src/ui/components/target-table";
+import { useImportBatches } from "../../../src/ui/hooks/use-import-batches";
 import { useAddTarget, useResetTargets, useTargets } from "../../../src/ui/hooks/use-targets";
 import { useActivateProfile, useProfileList } from "../../../src/ui/hooks/use-profiles";
 import { statusLabel } from "../../../src/ui/lib/status-labels";
@@ -45,10 +46,10 @@ export default function TargetsPage() {
   });
 
   const [newUrl, setNewUrl] = useState("");
-  const [lastCsvName, setLastCsvName] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const addTarget = useAddTarget();
   const resetTargets = useResetTargets();
+  const { data: importBatches } = useImportBatches(profileId);
 
   const [openCount, setOpenCount] = useState("3");
   const [isOpeningBatch, setIsOpeningBatch] = useState(false);
@@ -70,7 +71,6 @@ export default function TargetsPage() {
     if (!confirm("このプロジェクトの全ターゲット（実行履歴・スクリーンショットを含む）を削除します。よろしいですか？")) return;
     try {
       await resetTargets.mutateAsync(profileId);
-      setLastCsvName(null);
       setImportMessage("全件削除しました");
     } catch (e) {
       setImportMessage(e instanceof Error ? e.message : "削除に失敗しました");
@@ -156,8 +156,7 @@ export default function TargetsPage() {
             {profileId && (
               <TargetImportForm
                 profileId={profileId}
-                onImported={({ fileName, importedCount, skippedLineCount }) => {
-                  setLastCsvName(fileName);
+                onImported={({ importedCount, skippedLineCount }) => {
                   setImportMessage(
                     `${importedCount}件インポートしました${skippedLineCount > 0 ? `（${skippedLineCount}行スキップ）` : ""}`,
                   );
@@ -175,10 +174,27 @@ export default function TargetsPage() {
             CSV: 1行1URL、またはカンマ・タブ区切り。UTF-8で保存。取込むと選択中のプロジェクトに追加されます。
           </p>
           {importMessage && <p className="text-xs text-muted-foreground">{importMessage}</p>}
-          {lastCsvName && (
-            <p className="text-xs text-muted-foreground">
-              現在のCSV: <Badge variant="secondary">{lastCsvName}</Badge>
-            </p>
+          {importBatches && importBatches.length > 0 && (
+            <div className="pt-2">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">取り込んだCSV</p>
+              <ul className="space-y-1">
+                {importBatches.map((batch) => (
+                  <li key={batch.id} className="flex flex-wrap items-center gap-2 text-xs">
+                    <Badge variant="secondary">{batch.fileName}</Badge>
+                    <span className="text-muted-foreground">{batch.targetCount}件</span>
+                    <span className="text-muted-foreground">
+                      {new Date(batch.importedAt).toLocaleString("ja-JP", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </CardContent>
       </Card>
