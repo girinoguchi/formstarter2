@@ -219,17 +219,10 @@ export default function TargetsPage() {
       <Card className="mb-6 border-primary/20 bg-primary/5">
         <CardContent>
           <p className="mb-4 text-sm font-semibold text-primary">使い方</p>
-          <div className="flex flex-wrap items-center gap-6 text-sm">
+          <div className="space-y-3 text-sm">
             <HowToStep n={1} title="URLを追加" desc="追加・CSV取込どちらでも" />
-            <span className="text-muted-foreground">→</span>
             <HowToStep n={2} title="自動で探索" desc="ウィンドウは開かず裏で確認" />
-            <span className="text-muted-foreground">→</span>
-            <HowToStep
-              n={3}
-              title="「入力」を押す"
-              desc="「送信可能」な行のみ。1件ずつでも「まとめて開く」で件数指定でも"
-            />
-            <span className="text-muted-foreground">→</span>
+            <HowToStep n={3} title="「入力」を押す" desc="送信可能な行を1件ずつ、または件数指定でまとめて" />
             <HowToStep n={4} title="送信" desc="開いたタブで内容確認して送信" />
           </div>
         </CardContent>
