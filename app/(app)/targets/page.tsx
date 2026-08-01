@@ -10,19 +10,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { TARGET_STATUSES, type TargetStatus } from "../../src/domain/value-objects/run-status";
-import { ActiveRunsPanel } from "../../src/ui/components/active-runs-panel";
-import { ExploringIndicator } from "../../src/ui/components/exploring-indicator";
-import { TargetImportForm } from "../../src/ui/components/target-import-form";
-import { TargetTable } from "../../src/ui/components/target-table";
-import { useAddTarget, useResetTargets, useTargets } from "../../src/ui/hooks/use-targets";
-import { useActivateProfile, useProfileList } from "../../src/ui/hooks/use-profiles";
-import { statusLabel } from "../../src/ui/lib/status-labels";
+import { TARGET_STATUSES, type TargetStatus } from "../../../src/domain/value-objects/run-status";
+import { ActiveRunsPanel } from "../../../src/ui/components/active-runs-panel";
+import { ExploringIndicator } from "../../../src/ui/components/exploring-indicator";
+import { TargetImportForm } from "../../../src/ui/components/target-import-form";
+import { TargetTable } from "../../../src/ui/components/target-table";
+import { useAddTarget, useResetTargets, useTargets } from "../../../src/ui/hooks/use-targets";
+import { useActivateProfile, useProfileList } from "../../../src/ui/hooks/use-profiles";
+import { statusLabel } from "../../../src/ui/lib/status-labels";
+import { useAuth } from "../../../src/ui/providers/auth-provider";
 
 const ALL_STATUSES_VALUE = "ALL";
 const FAILED_LIKE_STATUSES = new Set(["FAILED", "NOT_SENDABLE", "BLOCKED"]);
 
 export default function TargetsPage() {
+  const { isAdmin } = useAuth();
   const { data: profiles } = useProfileList();
   const [profileId, setProfileId] = useState<string | null>(null);
   const activateProfile = useActivateProfile();
@@ -48,6 +50,10 @@ export default function TargetsPage() {
   const addTarget = useAddTarget();
   const resetTargets = useResetTargets();
 
+  const [openCount, setOpenCount] = useState("3");
+  const [isOpeningBatch, setIsOpeningBatch] = useState(false);
+  const [openBatchMessage, setOpenBatchMessage] = useState<string | null>(null);
+
   async function handleProfileChange(id: string) {
     setProfileId(id);
     await activateProfile.mutateAsync(id);
@@ -68,6 +74,33 @@ export default function TargetsPage() {
       setImportMessage("全件削除しました");
     } catch (e) {
       setImportMessage(e instanceof Error ? e.message : "削除に失敗しました");
+    }
+  }
+
+  async function handleOpenBatch() {
+    if (!profileId) return;
+    const count = Number(openCount);
+    if (!Number.isInteger(count) || count < 1) return;
+
+    setIsOpeningBatch(true);
+    setOpenBatchMessage(null);
+    try {
+      const res = await fetch("/api/targets/open-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId, count }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "開始に失敗しました");
+      setOpenBatchMessage(
+        body.opened === 0
+          ? "送信可能な対象がありませんでした"
+          : `${body.opened}件のタブを開きます（送信可能: ${body.available}件中）`,
+      );
+    } catch (e) {
+      setOpenBatchMessage(e instanceof Error ? e.message : "開始に失敗しました");
+    } finally {
+      setIsOpeningBatch(false);
     }
   }
 
@@ -131,9 +164,11 @@ export default function TargetsPage() {
                 }}
               />
             )}
-            <Button variant="outline" className="text-destructive hover:bg-destructive/10" onClick={handleResetAll}>
-              全件リセット
-            </Button>
+            {isAdmin && (
+              <Button variant="outline" className="text-destructive hover:bg-destructive/10" onClick={handleResetAll}>
+                全件リセット
+              </Button>
+            )}
           </div>
 
           <p className="text-xs text-muted-foreground">
@@ -160,6 +195,31 @@ export default function TargetsPage() {
             <span className="text-muted-foreground">→</span>
             <HowToStep n={4} title="送信" desc="開いたタブで内容確認して送信" />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardContent>
+          <p className="mb-3 text-sm font-semibold">まとめて開く</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm text-muted-foreground">送信可能なものを</span>
+            <Input
+              type="number"
+              min={1}
+              max={50}
+              value={openCount}
+              onChange={(e) => setOpenCount(e.target.value)}
+              className="w-20"
+            />
+            <span className="text-sm text-muted-foreground">件だけタブで開く</span>
+            <Button onClick={handleOpenBatch} disabled={isOpeningBatch || !profileId}>
+              {isOpeningBatch ? "開いています..." : "開く"}
+            </Button>
+            {openBatchMessage && <span className="text-sm text-muted-foreground">{openBatchMessage}</span>}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            指定した件数だけ、同じウィンドウ内にタブが開きます。大量にある場合も指定した件数以上は開きません。
+          </p>
         </CardContent>
       </Card>
 
@@ -193,16 +253,20 @@ export default function TargetsPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-56"
           />
-          <Button variant="outline" asChild>
-            <a href={`/api/runs/export${profileId ? `?profileId=${profileId}` : ""}`}>
-              CSVエクスポート（会社名・メール・WEB）
-            </a>
-          </Button>
-          <Button variant="outline" asChild>
-            <a href={`/api/runs/export?failedOnly=1${profileId ? `&profileId=${profileId}` : ""}`}>
-              送信失敗一覧CSV（{failedCount}件）
-            </a>
-          </Button>
+          {isAdmin && (
+            <>
+              <Button variant="outline" asChild>
+                <a href={`/api/runs/export${profileId ? `?profileId=${profileId}` : ""}`}>
+                  CSVエクスポート（会社名・メール・WEB）
+                </a>
+              </Button>
+              <Button variant="outline" asChild>
+                <a href={`/api/runs/export?failedOnly=1${profileId ? `&profileId=${profileId}` : ""}`}>
+                  送信失敗一覧CSV（{failedCount}件）
+                </a>
+              </Button>
+            </>
+          )}
         </div>
       </div>
       <p className="mb-4 text-xs text-muted-foreground">

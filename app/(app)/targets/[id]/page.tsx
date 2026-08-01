@@ -6,13 +6,13 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-import { RunErrorPanel } from "../../../src/ui/components/run-error-panel";
-import { RunLogViewer } from "../../../src/ui/components/run-log-viewer";
-import { RunStatusBadge } from "../../../src/ui/components/run-status-badge";
-import { ScreenshotGallery } from "../../../src/ui/components/screenshot-gallery";
-import { useTarget } from "../../../src/ui/hooks/use-targets";
-import { useRunStatus, useTargetRuns } from "../../../src/ui/hooks/use-run-status";
-import { statusLabel } from "../../../src/ui/lib/status-labels";
+import { RunErrorPanel } from "../../../../src/ui/components/run-error-panel";
+import { RunLogViewer } from "../../../../src/ui/components/run-log-viewer";
+import { RunStatusBadge } from "../../../../src/ui/components/run-status-badge";
+import { ScreenshotGallery } from "../../../../src/ui/components/screenshot-gallery";
+import { useTarget } from "../../../../src/ui/hooks/use-targets";
+import { useRunStatus, useTargetRuns } from "../../../../src/ui/hooks/use-run-status";
+import { statusLabel } from "../../../../src/ui/lib/status-labels";
 
 export default function TargetDetailPage() {
   const params = useParams<{ id: string }>();
