@@ -222,7 +222,11 @@ export default function TargetsPage() {
           <div className="space-y-3 text-sm">
             <HowToStep n={1} title="URLを追加" desc="追加・CSV取込どちらでも" />
             <HowToStep n={2} title="自動で探索" desc="ウィンドウは開かず裏で確認" />
-            <HowToStep n={3} title="「入力」を押す" desc="送信可能な行を1件ずつ、または件数指定でまとめて" />
+            <HowToStep
+              n={3}
+              title="「入力」を押す"
+              desc="「送信可能」になった行のみ操作できます。1件ずつでも、まとめて開くボタンで複数件を一度に開くこともできます"
+            />
             <HowToStep n={4} title="送信" desc="開いたタブで内容確認して送信" />
           </div>
         </CardContent>
