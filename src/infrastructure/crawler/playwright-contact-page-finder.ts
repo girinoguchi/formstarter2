@@ -46,6 +46,21 @@ export class PlaywrightContactPageFinder implements ContactPageFinder {
         }
       }
 
+      // 現在地を示すだけで実際には遷移しない自己参照リンク（今見ているページ自身を
+      // 指すナビゲーション項目）を候補から除外する（http-contact-page-finder.tsの
+      // isSelfLinkと同じ判定だが、ここはブラウザに渡すevaluate内なので自己完結させる）。
+      function isSelfLink(candidateHref: string): boolean {
+        try {
+          const normalize = (url: string) => {
+            const u = new URL(url);
+            return `${u.hostname.replace(/^www\./, "")}${u.pathname.replace(/\/$/, "")}${u.search}`;
+          };
+          return normalize(candidateHref) === normalize(location.href);
+        } catch {
+          return false;
+        }
+      }
+
       let best: EvaluateResult | null = null;
       const anchors = Array.from(document.querySelectorAll("a[href]"));
 
@@ -61,6 +76,7 @@ export class PlaywrightContactPageFinder implements ContactPageFinder {
 
         const resolvedHref = (anchor as HTMLAnchorElement).href;
         if (!isSameSite(resolvedHref)) continue;
+        if (isSelfLink(resolvedHref)) continue;
 
         const score = landmarkScore(anchor);
         if (best && score <= best.score) continue;

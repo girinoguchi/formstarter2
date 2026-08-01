@@ -539,7 +539,7 @@ export class RunOrchestrator {
       }
 
       const forms = await this.formParser.parseForms(headless.session);
-      if (forms.length === 0) {
+      if (forms.length === 0 || !looksLikeContactForm(pickBestForm(forms))) {
         return { ok: false, finalStatus: "NOT_SENDABLE", errorStep: "NO_FORM_FOUND" };
       }
 
@@ -661,6 +661,24 @@ function computeFormSignatureHash(form: ParsedForm): string {
     .sort()
     .join(";");
   return createHash("sha1").update(signature).digest("hex").slice(0, 16);
+}
+
+/**
+ * サイト内検索・ニュースレター購読等、明らかに問い合わせ用途ではないフォームを
+ * EXPLOREのREADY判定から除外する最低限のフィルタ。<form>タグの存在だけでは
+ * ヘッダー/フッター共通部品の検索フォーム等を誤って問い合わせフォームと
+ * 判定してしまう実バグがあった（kirin.co.jp/recolte-jp.com等の実データで確認）。
+ * 氏名/メールいずれかの項目があるか、3項目以上あれば「らしい」とみなす
+ * （scoreFormの加点基準と揃えている）。
+ */
+function looksLikeContactForm(form: ParsedForm): boolean {
+  const hasEmail = form.fields.some(
+    (f) => f.type === "email" || EMAIL_PATTERN.test(f.name ?? "") || EMAIL_PATTERN.test(f.label ?? ""),
+  );
+  const hasName = form.fields.some(
+    (f) => NAME_OR_LABEL_NAME_PATTERN.test(f.label ?? "") || NAME_OR_LABEL_NAME_PATTERN.test(f.name ?? ""),
+  );
+  return hasEmail || hasName || form.fields.length >= 3;
 }
 
 function scoreForm(form: ParsedForm): number {

@@ -2,7 +2,7 @@ import * as cheerio from "cheerio";
 
 import type { ContactPageFinder, ContactPageFinderResult } from "../../domain/ports/contact-page-finder.port";
 import { CONTACT_LINK_KEYWORDS } from "../../config/constants";
-import { isSameSite } from "./same-site";
+import { isSameSite, isSelfLink } from "./same-site";
 
 type Landmark = "header" | "nav" | "footer" | "other";
 
@@ -62,6 +62,9 @@ export class HttpContactPageFinder implements ContactPageFinder {
         // 別ドメインのリンク(SNSプラットフォームの定型ヘルプページ等)を
         // 実際の問い合わせページと誤認しないよう、同一サイトの候補のみ受け付ける。
         if (!isSameSite(resolved, siteUrl)) return;
+        // 現在地を示すだけで実際には遷移しない自己参照リンク（「サポート／お問い合わせ」等の
+        // ナビゲーション項目が今見ているページ自身を指すケース）は候補から除外する。
+        if (isSelfLink(resolved, siteUrl)) return;
         best = { url: resolved, score };
       } catch {
         // 不正なURLは無視

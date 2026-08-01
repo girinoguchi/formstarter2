@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isSameSite } from "./same-site";
+import { isSameSite, isSelfLink } from "./same-site";
 
 describe("isSameSite", () => {
   it("treats www. as the same site", () => {
@@ -21,5 +21,23 @@ describe("isSameSite", () => {
 
   it("returns false for malformed URLs instead of throwing", () => {
     expect(isSameSite("not a url", "https://example.com/")).toBe(false);
+  });
+});
+
+describe("isSelfLink", () => {
+  // recolte-jp.com/support/: ナビゲーションの「サポート／お問い合わせ」が現在地を
+  // 示すだけで自分自身を指しており、実在する個別の問い合わせフォームへのリンクより
+  // 先にマッチして誤ってREADYになっていた実バグの回帰テスト。
+  it("treats a link back to the current page (ignoring trailing slash) as a self link", () => {
+    expect(isSelfLink("https://recolte-jp.com/support/", "https://recolte-jp.com/support")).toBe(true);
+    expect(isSelfLink("https://recolte-jp.com/support", "https://recolte-jp.com/support/")).toBe(true);
+  });
+
+  it("does not treat a distinct sub-page as a self link", () => {
+    expect(isSelfLink("https://recolte-jp.com/support/contact/", "https://recolte-jp.com/support/")).toBe(false);
+  });
+
+  it("returns false for malformed URLs instead of throwing", () => {
+    expect(isSelfLink("not a url", "https://example.com/")).toBe(false);
   });
 });
