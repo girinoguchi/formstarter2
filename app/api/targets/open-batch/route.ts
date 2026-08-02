@@ -47,5 +47,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ opened, available: freshTargets.length });
+  // availableは「送信可能」の母数として一覧画面のフォーム発見率等と揃うよう、
+  // 既に開いているものを除く前のREADY全体の件数を返す（除外は候補選定にのみ使う）。
+  return NextResponse.json({ opened, available: readyTargets.length });
 }
