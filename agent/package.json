@@ -1,0 +1,19 @@
+{
+  "name": "formstarter2-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "formstarter2のローカルエージェント。顧客本人のPC上でChromeを起動し、VPS側のPlaywrightコードとCDP経由で中継する。",
+  "scripts": {
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "ws": "^8.21.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.23.4",
+    "typescript": "^5"
+  }
+}

@@ -146,7 +146,9 @@ export class PrismaRunRepository implements RunRepository {
     return rows.map((r) => r.targetId);
   }
 
-  async listActive(filter?: { profileId?: string; kind?: RunKind }): Promise<readonly ActiveRunSummary[]> {
+  async listActive(
+    filter?: { profileId?: string; ownerId?: string; kind?: RunKind },
+  ): Promise<readonly ActiveRunSummary[]> {
     // CONTEXT_KEPT_OPEN_RUN_STATUSES（AWAITING_SEND等での「タブを開いたまま」扱い）はFILLにしか
     // 意味がない。EXPLOREは可視タブを持たないため、NOT_SENDABLE等の終端statusをここに含めると
     // 「探索が終わって送信不可になっただけ」のRunまで「探索中」と誤表示してしまう
@@ -163,9 +165,14 @@ export class PrismaRunRepository implements RunRepository {
           }
         : { finishedAt: null };
 
+    const targetFilter = {
+      ...(filter?.profileId ? { profileId: filter.profileId } : {}),
+      ...(filter?.ownerId ? { profile: { ownerId: filter.ownerId } } : {}),
+    };
+
     const rows = await this.client.run.findMany({
       where: {
-        ...(filter?.profileId ? { target: { profileId: filter.profileId } } : {}),
+        ...(Object.keys(targetFilter).length > 0 ? { target: targetFilter } : {}),
         ...(filter?.kind ? { kind: filter.kind } : {}),
         ...activeCondition,
       },

@@ -30,11 +30,18 @@ export interface OpenBrowserTarget {
  * 並列実行時、上限内で複数コンテキストを同時保持できる想定（Step13で対応）。
  */
 export interface BrowserSessionFactory {
-  acquire(windowLabel: string): Promise<AcquiredBrowserSession>;
+  /**
+   * ownerIdはheaded（PlaywrightSessionManager）実装のみが必須で使う——アカウントごとに
+   * 顧客自身のPC上のChromeへエージェント経由で中継するため、どのユーザーのエージェントに
+   * つなぐかを指定する必要がある。headless（HeadlessPlaywrightSessionManager、EXPLORE専用）
+   * はローカルのPlaywright管理ブラウザをそのまま使うためownerIdを必要としない——
+   * オプショナルにしているのはそちらの実装を無修正のままにするため。
+   */
+  acquire(windowLabel: string, ownerId?: string): Promise<AcquiredBrowserSession>;
   /**
    * 現在開いているタブ一覧を、CDPセッションを新たに張らない軽量なHTTPメタデータ取得
    * だけで返す（Cloudflare Turnstile対策としてCDP接続を増やさないための設計）。
    * detach済みのタブの生死・URL遷移をポーリングで追跡するために使う。
    */
-  listOpenTargets(): Promise<readonly OpenBrowserTarget[]>;
+  listOpenTargets(ownerId?: string): Promise<readonly OpenBrowserTarget[]>;
 }

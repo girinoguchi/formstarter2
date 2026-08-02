@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   }
 
   await getRunOrchestrator()
-    .reconcileOpenTabs()
+    .reconcileOpenTabs(guard.user.id)
     .catch((error: unknown) => {
       console.error("[api/runs/active] reconcileOpenTabs failed:", error);
     });

@@ -124,14 +124,14 @@ export class RunOrchestrator {
    * ——「開いているタブ」一覧の2秒おきのポーリング(GET /api/runs/active)に相乗りして呼ぶ
    * 想定で、別途タイマーは持たない。
    */
-  async reconcileOpenTabs(): Promise<void> {
-    const activeRuns = await this.runRepository.listActive({ kind: "FILL" });
+  async reconcileOpenTabs(ownerId: string): Promise<void> {
+    const activeRuns = await this.runRepository.listActive({ kind: "FILL", ownerId });
     const trackable = activeRuns.filter(
       (r) => (r.status === "AWAITING_SEND" || r.status === "SENT") && r.cdpTargetId,
     );
     if (trackable.length === 0) return;
 
-    const openTargets = await this.headedSessionFactory.listOpenTargets();
+    const openTargets = await this.headedSessionFactory.listOpenTargets(ownerId);
     const openById = new Map(openTargets.map((t) => [t.id, t]));
 
     for (const run of trackable) {
@@ -265,9 +265,35 @@ export class RunOrchestrator {
 
     const windowLabel = target.companyName ?? safeHostname(target.url);
     await this.runRepository.updateStatus(run.id, "LAUNCHING_BROWSER", { startedAt: new Date(), windowLabel });
-    await this.runRepository.appendLog(run.id, "INFO", "BROWSER_LAUNCHED", "headedブラウザを起動しました");
 
-    const acquired = await this.headedSessionFactory.acquire(windowLabel);
+    // このtargetの所有者（＝どの顧客のローカルエージェントへ中継するか）をprofile経由で
+    // 解決する。下の方で入力データ取得用に同じprofileIdをもう一度引いているが、そちらは
+    // 「プロフィール未設定時でもタブは開いて人間に見せる」という既存のタイミングを崩さない
+    // ために意図的に分けている（重複読み取りだが安価なfindUniqueなので許容する）。
+    //
+    // ここで投げうるエラー（ownerId解決不可・エージェント未接続等）は、ブラウザを
+    // 何も掴む前に発生する——tryブロックの外側なので、専用にcatchしてRunをFAILEDに
+    // 進めておかないと「LAUNCHING_BROWSERのまま二度と進まない」ゴーストRunになる
+    // （エージェント未接続はSaaSの利用開始時に頻発する、想定内の失敗ケースのため）。
+    let acquired: Awaited<ReturnType<BrowserSessionFactory["acquire"]>>;
+    try {
+      const ownerProfile = await this.profileRepository.findByIdUnscoped(target.profileId);
+      if (!ownerProfile) {
+        throw new Error(`Profile not found for target ${target.id}`);
+      }
+      acquired = await this.headedSessionFactory.acquire(windowLabel, ownerProfile.ownerId);
+      await this.runRepository.appendLog(run.id, "INFO", "BROWSER_LAUNCHED", "headedブラウザを起動しました");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "ブラウザの起動に失敗しました";
+      await this.runRepository.appendLog(run.id, "ERROR", "BROWSER_LAUNCH_FAILED", message);
+      await this.runRepository.updateStatus(run.id, "FAILED", {
+        errorStep: "BROWSER_LAUNCH_FAILED",
+        errorMessage: message,
+        finishedAt: new Date(),
+      });
+      await this.targetRepository.updateStatus(target.id, "FAILED");
+      throw error;
+    }
 
     let finalStatus: RunStatus = "PENDING";
 

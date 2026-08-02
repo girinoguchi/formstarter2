@@ -1,9 +1,3 @@
-import { existsSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
-import { spawn } from "node:child_process";
-import { tmpdir } from "node:os";
-import path from "node:path";
-
 import { chromium, type Browser } from "playwright";
 
 import type {
@@ -11,41 +5,17 @@ import type {
   BrowserSessionFactory,
   OpenBrowserTarget,
 } from "../../domain/ports/browser-session-factory.port";
+import { getAgentTunnelRegistry } from "./agent-tunnel-registry";
 import { PlaywrightBrowserPage } from "./playwright-browser-page";
 
 const globalForBrowser = globalThis as unknown as {
   __playwrightHeadlessBrowser?: Promise<Browser>;
   __playwrightHeadlessContext?: Promise<import("playwright").BrowserContext>;
-  __sharedChromeReady?: Promise<void>;
 };
 
-const CHROME_DEBUG_PORT = 9422;
-const CHROME_PROFILE_DIR = path.join(tmpdir(), "formstarter-chrome-profile");
-
-// macOS想定（このアプリはローカルの長時間稼働Node.jsプロセスとして開発機で動く前提）。
-// 実行ファイルが見つからない環境（CI/Linux等）向けにwin32/linuxの一般的なパスも
-// フォールバックとして並べておくが、動作確認は行っていない。
-const CHROME_EXECUTABLE_CANDIDATES: readonly string[] =
-  process.platform === "win32"
-    ? [
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-      ]
-    : process.platform === "linux"
-      ? ["/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium-browser", "/usr/bin/chromium"]
-      : ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"];
-
-function findChromeExecutable(): string {
-  const found = CHROME_EXECUTABLE_CANDIDATES.find((p) => existsSync(p));
-  if (!found) {
-    throw new Error(
-      "実Chromeの実行ファイルが見つかりませんでした。Google Chromeをインストールしてください。",
-    );
-  }
-  return found;
-}
-
-// FormStarterapp（lib/playwrightPool.ts）で実測済みのLinux VPS向け起動引数をそのまま踏襲する。
+// FormStarterapp（lib/playwrightPool.ts）で実測済みのLinux VPS向け起動引数をそのまま踏襲する
+// （EXPLORE専用のheadlessブラウザ用。headedはもう顧客PC上のローカルエージェントが
+// 起動するため、このファイルではLinux固有の起動引数は使わない）。
 function getPlatformLaunchArgs(): string[] {
   if (process.platform !== "linux") return [];
   return [
@@ -111,41 +81,19 @@ async function ensureAtLeastOneTab(port: number): Promise<void> {
  * （next-standard.com）で確認した。launch()はPlaywright自身がプロセスを起動・管理する
  * ため自動化用の起動引数が付き、あとから取り除けない。
  *
- * そこで実Chromeを完全に独立したOSプロセスとして自前でspawnし（--remote-debugging-port
- * を開けるだけの、人間が普段使うのと同じ起動）、必要な間だけ connectOverCDP() で接続する。
- * 確認画面に到達し人間の最終操作（Turnstile解決・送信）を待つ段階になったら、この接続を
- * close()して切り離す——検証済みだが、connectOverCDP()経由のBrowser.close()は「実際の
- * Chromeプロセスを終了させず、このPlaywright接続だけを切断する」動作になる。切り離した後の
- * タブは自動化の痕跡が一切ない、ただのChromeタブになる。
+ * そこで実Chromeを完全に独立したOSプロセスとして起動し、必要な間だけ connectOverCDP() で
+ * 接続する。確認画面に到達し人間の最終操作（Turnstile解決・送信）を待つ段階になったら、
+ * この接続をclose()して切り離す——検証済みだが、connectOverCDP()経由のBrowser.close()は
+ * 「実際のChromeプロセスを終了させず、このPlaywright接続だけを切断する」動作になる。
+ * 切り離した後のタブは自動化の痕跡が一切ない、ただのChromeタブになる。
  *
- * 複数ターゲットを同時に扱えるよう、対象ごとに独立したconnectOverCDP()接続を張る
- * （同じ実行ファイル・同じウィンドウを共有しつつ）。これも検証済みだが、同一ブラウザに
- * 対する複数の独立したCDP接続は互いに干渉しないため、あるターゲットの接続をdetachしても
- * 他ターゲットの接続・タブには影響しない——「全ターゲットで1つのウィンドウを共有する」
- * という既存の設計（ウィンドウ乱立を避ける）はそのまま維持できる。
+ * SaaS化に伴い、このChromeは顧客本人のPC上でローカルエージェント（agent/）が起動する
+ * （送信ボタンは必ず本人が手動で押すため）。VPS側のこのクラスはChromeを自前でspawnせず、
+ * agent-tunnel-registryが管理する「そのownerId専用の中継ポート」に対してCDP接続するだけ
+ * ——中継の向こう側で本当にChromeが動いているかはagent-tunnel-registry.getLocalPort()が
+ * 保証する（未接続ならエラーになる）。上記のdetach前提・複数ターゲット独立接続の性質は
+ * トンネル越しでも変わらない（Chrome側からはローカル接続と区別がつかない）。
  */
-async function ensureSharedChromeProcess(): Promise<void> {
-  if (!globalForBrowser.__sharedChromeReady) {
-    globalForBrowser.__sharedChromeReady = (async () => {
-      await mkdir(CHROME_PROFILE_DIR, { recursive: true });
-      const executable = findChromeExecutable();
-      spawn(
-        executable,
-        [
-          `--remote-debugging-port=${CHROME_DEBUG_PORT}`,
-          `--user-data-dir=${CHROME_PROFILE_DIR}`,
-          "--no-first-run",
-          "--no-default-browser-check",
-          ...getPlatformLaunchArgs(),
-          "about:blank",
-        ],
-        { stdio: "ignore", detached: false },
-      );
-      await waitForDebuggerReady(CHROME_DEBUG_PORT);
-    })();
-  }
-  return globalForBrowser.__sharedChromeReady;
-}
 
 // 探索専用の非表示ブラウザ。人間に見せる必要がない「見つかるかどうか」の確認だけをここで
 // 行い、送信可能と判定できたときだけheaded側のタブを開く——無関係なウィンドウを画面に出さ
@@ -169,15 +117,22 @@ function getSharedHeadlessContext() {
 }
 
 export class PlaywrightSessionManager implements BrowserSessionFactory {
-  async acquire(windowLabel: string): Promise<AcquiredBrowserSession> {
-    await ensureSharedChromeProcess();
-    await ensureAtLeastOneTab(CHROME_DEBUG_PORT);
+  async acquire(windowLabel: string, ownerId?: string): Promise<AcquiredBrowserSession> {
+    if (!ownerId) {
+      throw new Error("PlaywrightSessionManager.acquire()にはownerIdが必須です");
+    }
+    const port = getAgentTunnelRegistry().getLocalPort(ownerId);
+    // エージェントが繋がった直後・顧客PC側のChromeがまだ起動しきっていないケースを
+    // カバーするため、疎通するまで軽くポーリングする（旧ensureSharedChromeProcessの
+    // waitForDebuggerReady呼び出しと同じ役割）。
+    await waitForDebuggerReady(port);
+    await ensureAtLeastOneTab(port);
 
     // OSレベルのウィンドウタイトルはPlaywrightから制御できないため、
     // windowLabelはUI側の active-runs-panel での表示判別にのみ使う（Step13）。
     void windowLabel;
 
-    const browser = await chromium.connectOverCDP(`http://127.0.0.1:${CHROME_DEBUG_PORT}`);
+    const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
     const context = browser.contexts()[0] ?? (await browser.newContext());
     const page = await context.newPage();
 
@@ -211,15 +166,16 @@ export class PlaywrightSessionManager implements BrowserSessionFactory {
    * 返す。detachしたタブの生死・タイトル変化をポーリングで追跡するために使う——
    * Cloudflare Turnstile対策としてCDP接続を増やさない設計を崩さないための意図的な選択。
    *
-   * __sharedChromeReady（このNodeプロセス内でのspawn状態）には依存しない——devサーバ
-   * 再起動後の新しいプロセスではこのフラグは未初期化になるが、既知のポートで実際に
-   * 稼働中のChromeプロセス自体は（別プロセスとして）生きたままのことがあるため、
-   * 常に実際のポートへ直接問い合わせる。繋がらなければ（起動前/クラッシュ等）
-   * 空配列を返し、呼び出し側（reconcileOpenTabs）が誤って「全部閉じられた」と
-   * 判定してしまわないよう、失敗はエラーとして呼び出し側に伝播させる。
+   * エージェントが未接続の場合はgetLocalPort()がエラーを投げ、そのまま呼び出し側
+   * （reconcileOpenTabs）に伝播する——空配列を返してしまうと「全部閉じられた」と
+   * 誤判定してしまうため、失敗は必ずエラーとして伝える。
    */
-  async listOpenTargets(): Promise<readonly OpenBrowserTarget[]> {
-    const targets = await listCdpTargets(CHROME_DEBUG_PORT);
+  async listOpenTargets(ownerId?: string): Promise<readonly OpenBrowserTarget[]> {
+    if (!ownerId) {
+      throw new Error("PlaywrightSessionManager.listOpenTargets()にはownerIdが必須です");
+    }
+    const port = getAgentTunnelRegistry().getLocalPort(ownerId);
+    const targets = await listCdpTargets(port);
     return targets.filter((t) => t.type === "page").map((t) => ({ id: t.id, url: t.url, title: t.title }));
   }
 }
