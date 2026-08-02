@@ -65,6 +65,7 @@ enum FieldCategory {
   EMAIL
   PHONE
   ADDRESS
+  PREFECTURE
   POSTAL_CODE
   URL
   INQUIRY_TYPE

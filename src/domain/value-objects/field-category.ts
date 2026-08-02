@@ -10,6 +10,7 @@ export const FIELD_CATEGORIES = [
   "EMAIL",
   "PHONE",
   "ADDRESS",
+  "PREFECTURE",
   "POSTAL_CODE",
   "URL",
   "DEPARTMENT",

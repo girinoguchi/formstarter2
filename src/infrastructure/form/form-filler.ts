@@ -4,6 +4,7 @@ import type { Profile } from "../../domain/entities/profile";
 import type { BrowserSession } from "../../domain/ports/browser-session.port";
 import type { FieldFillFailure, FormFiller } from "../../domain/ports/form-filler.port";
 import type { FieldCategory } from "../../domain/value-objects/field-category";
+import { extractPrefecture } from "../../domain/value-objects/prefectures";
 
 const TEXT_LIKE_FIELD_TYPES: readonly ParsedFormField["type"][] = [
   "text",
@@ -76,6 +77,8 @@ function resolveProfileValue(category: FieldCategory, profile: Profile): string 
       return combinePhone(profile.phone1, profile.phone2, profile.phone3);
     case "ADDRESS":
       return profile.address || null;
+    case "PREFECTURE":
+      return (profile.address && extractPrefecture(profile.address)) || null;
     case "POSTAL_CODE":
       return profile.postalCode || null;
     case "URL":

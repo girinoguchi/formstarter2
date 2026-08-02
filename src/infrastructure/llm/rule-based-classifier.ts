@@ -1,7 +1,21 @@
 import type { FieldClassification } from "../../domain/entities/field-classification";
-import type { ParsedFormField } from "../../domain/entities/form-field";
+import type { FormFieldOption, ParsedFormField } from "../../domain/entities/form-field";
 import type { FieldClassifier, FieldClassifierContext } from "../../domain/ports/field-classifier.port";
+import { JAPAN_PREFECTURES } from "../../domain/value-objects/prefectures";
 import { ALIAS_RULES } from "./alias-dictionary";
+
+// 都道府県プルダウンは、見出し（「都道府県」等）が実際の入力欄と離れた場所にある
+// 古いtableレイアウトのフォームではラベルを正しく拾えないことがある(fujiiryoki.co.jp等の
+// 実データで確認)。選択肢そのものが47都道府県の固定リストという強いシグナルなので、
+// ラベルに依存せず選択肢の中身で判定できる。プレースホルダ("---お選びください---"等)を
+// 含め多少のブレを許容するため、全47件ではなく閾値以上の一致で判定する。
+const PREFECTURE_SELECT_MATCH_THRESHOLD = 30;
+
+function isPrefectureSelect(options: readonly FormFieldOption[] | null): boolean {
+  if (!options) return false;
+  const matchCount = options.filter((o) => JAPAN_PREFECTURES.includes(o.label.trim())).length;
+  return matchCount >= PREFECTURE_SELECT_MATCH_THRESHOLD;
+}
 
 const CLASSIFIABLE_TYPES: readonly string[] = [
   "text",
@@ -56,6 +70,9 @@ export class RuleBasedFieldClassifier implements FieldClassifier {
     if (field.type === "email") return this.withCategory(field, "EMAIL", 0.5);
     if (field.type === "tel") return this.withCategory(field, "PHONE", 0.5);
     if (field.type === "textarea") return this.withCategory(field, "INQUIRY_BODY", 0.4);
+    if (field.type === "select" && isPrefectureSelect(field.options)) {
+      return this.withCategory(field, "PREFECTURE", 0.7);
+    }
 
     return this.withCategory(field, "UNKNOWN", 0);
   }
