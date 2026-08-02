@@ -156,16 +156,21 @@ export class PlaywrightSessionManager implements BrowserSessionFactory {
     // windowLabelはUI側の active-runs-panel での表示判別にのみ使う（Step13）。
     void windowLabel;
 
-    // 新しいタブのCDP target idを特定するため、作成前後の一覧を差分で比較する
-    // （Playwrightのpage.goto等ではなく、生HTTPエンドポイントで安定したIDを取る）。
-    const before = new Set((await listCdpTargets(CHROME_DEBUG_PORT)).map((t) => t.id));
-
     const browser = await chromium.connectOverCDP(`http://127.0.0.1:${CHROME_DEBUG_PORT}`);
     const context = browser.contexts()[0] ?? (await browser.newContext());
     const page = await context.newPage();
 
-    const after = await listCdpTargets(CHROME_DEBUG_PORT);
-    const cdpTargetId = after.find((t) => t.type === "page" && !before.has(t.id))?.id ?? null;
+    // 新しいタブのCDP target idは、そのページに紐づくCDPSessionへ直接
+    // Target.getTargetInfo（targetId省略時は「このセッション自身のtarget」を返す）を
+    // 投げて取得する——「まとめて開く」等で複数タブをほぼ同時に作成すると、作成前後の
+    // 一覧を差分で比較する方式（旧実装）は他のタブの作成と競合し、誤ったtarget idを
+    // 掴んでしまう実バグがあった（3件開いて1件だけ閉じたら全部消える、という形で発覚）。
+    // このページ自身のセッションに直接問い合わせれば、他タブの作成タイミングと無関係に
+    // 常に正しいidが取れる。
+    const cdpSession = await context.newCDPSession(page);
+    const { targetInfo } = await cdpSession.send("Target.getTargetInfo");
+    const cdpTargetId = targetInfo.targetId;
+    await cdpSession.detach().catch(() => {});
 
     return {
       session: new PlaywrightBrowserPage(page),
