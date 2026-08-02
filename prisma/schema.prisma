@@ -137,6 +137,12 @@ model Run {
   // 送信完了ページ（サンクスページ）への遷移を自動検知した時刻。検知できたらSENTへ
   // 遷移する（送信ボタン自体はこのアプリからは絶対にクリックしない——あくまで観測のみ）。
   sentAt               DateTime?
+  // AWAITING_SEND到達時にdetachする直前のCDP target id（Chromeのタブに対して安定したID）。
+  // detach後はPlaywright接続を持たないため、この生IDを使って/json/list（軽量なHTTP
+  // メタデータ取得のみで、CDPセッションを新たに張らない）と突き合わせ、タブが閉じられた・
+  // 送信完了ページへ遷移したことを検知する（Cloudflare Turnstile対策としてCDP接続自体を
+  // 増やさないための設計）。
+  cdpTargetId          String?
   screenshots          Screenshot[]
   logs                 RunLog[]
   fieldClassifications RunFieldClassification[]

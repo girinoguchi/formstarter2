@@ -17,6 +17,7 @@ export type RunUpdatablePatch = Partial<
     | "finishedAt"
     | "closedAt"
     | "sentAt"
+    | "cdpTargetId"
   >
 >;
 

@@ -15,5 +15,6 @@ export interface Run {
   finishedAt: Date | null;
   closedAt: Date | null;
   sentAt: Date | null;
+  cdpTargetId: string | null;
   createdAt: Date;
 }

@@ -117,6 +117,49 @@ export class RunOrchestrator {
     return run;
   }
 
+  /**
+   * detach済みでCDP接続を持たないAWAITING_SEND/SENTタブの生死・遷移を、CDPセッションを
+   * 新たに張らない軽量なポーリング（headedSessionFactory.listOpenTargets()）だけで追跡する。
+   * Cloudflare Turnstile対策としてCDP再接続を行わない設計を崩さないための意図的な選択
+   * ——「開いているタブ」一覧の2秒おきのポーリング(GET /api/runs/active)に相乗りして呼ぶ
+   * 想定で、別途タイマーは持たない。
+   */
+  async reconcileOpenTabs(): Promise<void> {
+    const activeRuns = await this.runRepository.listActive({ kind: "FILL" });
+    const trackable = activeRuns.filter(
+      (r) => (r.status === "AWAITING_SEND" || r.status === "SENT") && r.cdpTargetId,
+    );
+    if (trackable.length === 0) return;
+
+    const openTargets = await this.headedSessionFactory.listOpenTargets();
+    const openById = new Map(openTargets.map((t) => [t.id, t]));
+
+    for (const run of trackable) {
+      const live = openById.get(run.cdpTargetId as string);
+      if (!live) {
+        await this.runRepository.markClosed(run.id).catch((error: unknown) => {
+          console.error(`[RunOrchestrator] reconcileOpenTabs markClosed failed for run ${run.id}:`, error);
+        });
+        continue;
+      }
+
+      if (
+        run.status === "AWAITING_SEND" &&
+        this.sentPageDetector.isSentConfirmationPage({ url: live.url, title: live.title, bodyText: "" })
+      ) {
+        await this.runRepository.markSent(run.id).catch((error: unknown) => {
+          console.error(`[RunOrchestrator] reconcileOpenTabs markSent failed for run ${run.id}:`, error);
+        });
+        await this.targetRepository.updateStatus(run.targetId, "SENT").catch((error: unknown) => {
+          console.error(`[RunOrchestrator] reconcileOpenTabs target status failed for run ${run.id}:`, error);
+        });
+        await this.runRepository
+          .appendLog(run.id, "INFO", "SENT_DETECTED", `送信完了ページへの遷移をタブ一覧のポーリングで検知しました: ${live.url}`)
+          .catch(() => {});
+      }
+    }
+  }
+
   /** UIの「実行」ボタン用: Run行の作成まで待ち、あとはバックグラウンドで継続する（fire-and-forget）。 */
   async execute(targetId: string): Promise<Run> {
     const { target, run } = await this.startRun(targetId, "FILL");
@@ -402,8 +445,13 @@ export class RunOrchestrator {
 
       // 送信ボタンをクリックするコードパスはこのクラス・FormFillerのどちらにも存在しない。
       // ここでは「送信待ち」であることをUI/ログに記録し、ブラウザは開いたまま人間の操作を待つ。
+      // cdpTargetIdをここで保存しておき、detach後もreconcileOpenTabs()でタブの生死・
+      // 遷移を軽量に追跡できるようにする。
       finalStatus = "AWAITING_SEND";
-      await this.runRepository.updateStatus(run.id, finalStatus, { finishedAt: new Date() });
+      await this.runRepository.updateStatus(run.id, finalStatus, {
+        finishedAt: new Date(),
+        cdpTargetId: acquired.cdpTargetId ?? undefined,
+      });
       await this.targetRepository.updateStatus(target.id, finalStatus);
       await this.runRepository.appendLog(run.id, "INFO", "AWAITING_SEND", "送信待ち — 人間の操作をお待ちください");
     } catch (error) {

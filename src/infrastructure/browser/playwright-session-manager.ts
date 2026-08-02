@@ -9,6 +9,7 @@ import { chromium, type Browser } from "playwright";
 import type {
   AcquiredBrowserSession,
   BrowserSessionFactory,
+  OpenBrowserTarget,
 } from "../../domain/ports/browser-session-factory.port";
 import { PlaywrightBrowserPage } from "./playwright-browser-page";
 
@@ -58,6 +59,18 @@ async function waitForDebuggerReady(port: number, timeoutMs = 15_000): Promise<v
   throw new Error(`Chromeのデバッグポート(${port})が起動しませんでした`);
 }
 
+interface CdpListEntry {
+  id: string;
+  type: string;
+  url: string;
+  title: string;
+}
+
+async function listCdpTargets(port: number): Promise<readonly CdpListEntry[]> {
+  const res = await fetch(`http://127.0.0.1:${port}/json/list`);
+  return (await res.json()) as CdpListEntry[];
+}
+
 /**
  * 人間がタブ・ウィンドウを全部閉じてタブ数0の状態になると、Playwrightの
  * connectOverCDP()自体が「Browser.setDownloadBehavior: Browser context management
@@ -67,8 +80,7 @@ async function waitForDebuggerReady(port: number, timeoutMs = 15_000): Promise<v
  * ブラウザ本体に対して直接作成するため、この制約を踏まない。
  */
 async function ensureAtLeastOneTab(port: number): Promise<void> {
-  const res = await fetch(`http://127.0.0.1:${port}/json/list`);
-  const list = (await res.json()) as unknown[];
+  const list = await listCdpTargets(port);
   if (list.length === 0) {
     await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: "PUT" });
   }
@@ -144,12 +156,20 @@ export class PlaywrightSessionManager implements BrowserSessionFactory {
     // windowLabelはUI側の active-runs-panel での表示判別にのみ使う（Step13）。
     void windowLabel;
 
+    // 新しいタブのCDP target idを特定するため、作成前後の一覧を差分で比較する
+    // （Playwrightのpage.goto等ではなく、生HTTPエンドポイントで安定したIDを取る）。
+    const before = new Set((await listCdpTargets(CHROME_DEBUG_PORT)).map((t) => t.id));
+
     const browser = await chromium.connectOverCDP(`http://127.0.0.1:${CHROME_DEBUG_PORT}`);
     const context = browser.contexts()[0] ?? (await browser.newContext());
     const page = await context.newPage();
 
+    const after = await listCdpTargets(CHROME_DEBUG_PORT);
+    const cdpTargetId = after.find((t) => t.type === "page" && !before.has(t.id))?.id ?? null;
+
     return {
       session: new PlaywrightBrowserPage(page),
+      cdpTargetId,
       release: async () => {
         await page.close().catch(() => {});
         await browser.close().catch(() => {});
@@ -158,6 +178,23 @@ export class PlaywrightSessionManager implements BrowserSessionFactory {
         await browser.close();
       },
     };
+  }
+
+  /**
+   * CDPセッションを新たに張らない軽量なHTTP GET(/json/list)だけで現在開いているタブを
+   * 返す。detachしたタブの生死・タイトル変化をポーリングで追跡するために使う——
+   * Cloudflare Turnstile対策としてCDP接続を増やさない設計を崩さないための意図的な選択。
+   *
+   * __sharedChromeReady（このNodeプロセス内でのspawn状態）には依存しない——devサーバ
+   * 再起動後の新しいプロセスではこのフラグは未初期化になるが、既知のポートで実際に
+   * 稼働中のChromeプロセス自体は（別プロセスとして）生きたままのことがあるため、
+   * 常に実際のポートへ直接問い合わせる。繋がらなければ（起動前/クラッシュ等）
+   * 空配列を返し、呼び出し側（reconcileOpenTabs）が誤って「全部閉じられた」と
+   * 判定してしまわないよう、失敗はエラーとして呼び出し側に伝播させる。
+   */
+  async listOpenTargets(): Promise<readonly OpenBrowserTarget[]> {
+    const targets = await listCdpTargets(CHROME_DEBUG_PORT);
+    return targets.filter((t) => t.type === "page").map((t) => ({ id: t.id, url: t.url, title: t.title }));
   }
 }
 
@@ -173,6 +210,7 @@ export class HeadlessPlaywrightSessionManager implements BrowserSessionFactory {
 
     return {
       session: new PlaywrightBrowserPage(page),
+      cdpTargetId: null,
       release: async () => {
         await page.close();
       },
@@ -182,5 +220,10 @@ export class HeadlessPlaywrightSessionManager implements BrowserSessionFactory {
         await page.close();
       },
     };
+  }
+
+  // EXPLOREは追跡対象にならないため呼ばれない想定——インターフェースを満たすためだけに存在する。
+  async listOpenTargets(): Promise<readonly OpenBrowserTarget[]> {
+    return [];
   }
 }

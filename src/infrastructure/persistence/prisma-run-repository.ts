@@ -30,6 +30,7 @@ function toDomain(row: PrismaRun): Run {
     finishedAt: row.finishedAt,
     closedAt: row.closedAt,
     sentAt: row.sentAt,
+    cdpTargetId: row.cdpTargetId,
     createdAt: row.createdAt,
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import type { RunKind } from "../../domain/value-objects/run-kind";
 import type { RunStatus } from "../../domain/value-objects/run-status";
@@ -33,26 +33,5 @@ export function useActiveRuns(profileId: string | null, kind?: RunKind) {
     queryFn: () => fetchActiveRuns(profileId, kind),
     refetchInterval: 2000,
     enabled: profileId !== null,
-  });
-}
-
-async function markSent(runId: string) {
-  const res = await fetch(`/api/runs/${runId}/mark-sent`, { method: "POST" });
-  if (!res.ok) throw new Error("送信済みへの更新に失敗しました");
-  return res.json();
-}
-
-/**
- * 確認画面到達後はCDP接続をdetachしており自動検知ができないため、人間が実際に
- * 送信ボタンを押したことをこのボタン経由で能動的に伝える運用にしている。
- */
-export function useMarkSent() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: markSent,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["runs", "active"] });
-      queryClient.invalidateQueries({ queryKey: ["targets"] });
-    },
   });
 }
