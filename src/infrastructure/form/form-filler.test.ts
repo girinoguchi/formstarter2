@@ -78,6 +78,7 @@ function field(overrides: Partial<ParsedFormField>): ParsedFormField {
 
 const PROFILE: Profile = {
   id: "p1",
+  ownerId: "u1",
   name: "test",
   isActive: true,
   companyName: "テスト株式会社",

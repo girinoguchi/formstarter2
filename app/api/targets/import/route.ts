@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getCsvImportService, getExplorePool } from "../../../../src/lib/di";
+import { requireOwnedProfile, requireSession } from "../../../../src/lib/ownership";
 
 export async function POST(request: NextRequest) {
+  const guard = await requireSession();
+  if ("response" in guard) return guard.response;
+
   const formData = await request.formData();
   const file = formData.get("file");
   const profileId = formData.get("profileId");
@@ -12,6 +16,9 @@ export async function POST(request: NextRequest) {
   }
   if (typeof profileId !== "string" || !profileId) {
     return NextResponse.json({ error: "profileId is required" }, { status: 400 });
+  }
+  if (!(await requireOwnedProfile(profileId, guard.user.id))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
   const csvText = await file.text();

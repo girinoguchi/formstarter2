@@ -345,8 +345,10 @@ export class RunOrchestrator {
 
       await this.runRepository.updateStatus(run.id, "CLASSIFYING_FIELDS", { finishedAt: new Date() });
 
-      const activeProfile = await this.profileRepository.getActive();
-      if (!activeProfile) {
+      // アクティブなプロフィールではなく、このtargetが属するprofileの入力データを使う
+      // （アカウント分離後、「グローバルにアクティブな1件」は他ユーザーのものである可能性がある）。
+      const targetProfile = await this.profileRepository.findByIdUnscoped(target.profileId);
+      if (!targetProfile) {
         await this.runRepository.appendLog(
           run.id,
           "WARN",
@@ -365,9 +367,9 @@ export class RunOrchestrator {
       // {{company}}/{{url}} をこのターゲット向けに展開したプロフィールを使う
       // （テンプレートタブの「変数」表記どおりの挙動）。
       const profile: Profile = {
-        ...activeProfile,
-        inquiryType: substituteTemplateVariables(activeProfile.inquiryType, target),
-        inquiryBody: substituteTemplateVariables(activeProfile.inquiryBody, target),
+        ...targetProfile,
+        inquiryType: substituteTemplateVariables(targetProfile.inquiryType, target),
+        inquiryBody: substituteTemplateVariables(targetProfile.inquiryBody, target),
       };
 
       await this.runRepository.updateStatus(run.id, "FILLING_FORM");

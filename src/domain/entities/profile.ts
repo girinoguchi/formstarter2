@@ -1,5 +1,6 @@
 export interface Profile {
   id: string;
+  ownerId: string;
   name: string;
   isActive: boolean;
   companyName: string;

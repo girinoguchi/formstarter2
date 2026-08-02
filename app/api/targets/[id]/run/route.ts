@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getRunOrchestrator, getTargetRepository } from "../../../../../src/lib/di";
+import { getRunOrchestrator } from "../../../../../src/lib/di";
+import { requireOwnedTarget, requireSession } from "../../../../../src/lib/ownership";
 
 /**
  * target.contactPageUrl が未確定（＝まだ探索していない、または探索が
@@ -9,9 +10,12 @@ import { getRunOrchestrator, getTargetRepository } from "../../../../../src/lib/
  * 再開する。ボタン側は「実行」「再実行」の区別のみでよく、内部でどちらのフェーズかを判定する。
  */
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await requireSession();
+  if ("response" in guard) return guard.response;
+
   const { id } = await params;
 
-  const target = await getTargetRepository().findById(id);
+  const target = await requireOwnedTarget(id, guard.user.id);
   if (!target) {
     return NextResponse.json({ error: "target not found" }, { status: 404 });
   }
