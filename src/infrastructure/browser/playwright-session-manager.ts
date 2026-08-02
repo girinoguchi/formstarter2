@@ -45,6 +45,23 @@ function findChromeExecutable(): string {
   return found;
 }
 
+// FormStarterapp（lib/playwrightPool.ts）で実測済みのLinux VPS向け起動引数をそのまま踏襲する。
+function getPlatformLaunchArgs(): string[] {
+  if (process.platform !== "linux") return [];
+  return [
+    // rootで実行するVPS上ではsandboxが使えず、--no-sandboxが無いとChromeが起動時に
+    // 即クラッシュする（実測: "Running as root without --no-sandbox is not supported"）。
+    "--no-sandbox",
+    // Linux VPSでは/dev/shmが64MB制限のことが多く、無いとディスクI/Oにフォールバックして激遅になる。
+    "--disable-dev-shm-usage",
+    // 実GPUなし・Xvfb環境ではデフォルトだとWebGLがSwiftShaderにフォールバックし、
+    // それ自体がheadless検知シグナルになる。Mesa/llvmpipeのsoftware rasterizerを
+    // 使わせることで自然なGPU情報を返させる。
+    "--ignore-gpu-blocklist",
+    "--enable-gpu-rasterization",
+  ];
+}
+
 async function waitForDebuggerReady(port: number, timeoutMs = 15_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -119,6 +136,7 @@ async function ensureSharedChromeProcess(): Promise<void> {
           `--user-data-dir=${CHROME_PROFILE_DIR}`,
           "--no-first-run",
           "--no-default-browser-check",
+          ...getPlatformLaunchArgs(),
           "about:blank",
         ],
         { stdio: "ignore", detached: false },
@@ -135,7 +153,10 @@ async function ensureSharedChromeProcess(): Promise<void> {
 // CDP検知を気にする必要がなく、Playwright標準のchromium.launch()のままでよい。
 function getSharedHeadlessBrowser(): Promise<Browser> {
   if (!globalForBrowser.__playwrightHeadlessBrowser) {
-    globalForBrowser.__playwrightHeadlessBrowser = chromium.launch({ headless: true });
+    globalForBrowser.__playwrightHeadlessBrowser = chromium.launch({
+      headless: true,
+      args: getPlatformLaunchArgs(),
+    });
   }
   return globalForBrowser.__playwrightHeadlessBrowser;
 }
