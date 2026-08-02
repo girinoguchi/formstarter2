@@ -59,6 +59,22 @@ async function waitForDebuggerReady(port: number, timeoutMs = 15_000): Promise<v
 }
 
 /**
+ * 人間がタブ・ウィンドウを全部閉じてタブ数0の状態になると、Playwrightの
+ * connectOverCDP()自体が「Browser.setDownloadBehavior: Browser context management
+ * is not supported」というプロトコルエラーで失敗する（実データで確認済み）。
+ * connectOverCDP()を呼ぶ前に、CDPの生HTTPエンドポイント(/json/new)でタブを1つ
+ * 確保しておくことでこれを回避する——このタブ自体はPlaywright経由ではなく
+ * ブラウザ本体に対して直接作成するため、この制約を踏まない。
+ */
+async function ensureAtLeastOneTab(port: number): Promise<void> {
+  const res = await fetch(`http://127.0.0.1:${port}/json/list`);
+  const list = (await res.json()) as unknown[];
+  if (list.length === 0) {
+    await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: "PUT" });
+  }
+}
+
+/**
  * headedブラウザは Playwright の chromium.launch() では起動しない。
  *
  * Cloudflare Turnstile等のBot対策は「PlaywrightがCDPで接続していること自体」を検知し、
@@ -122,6 +138,7 @@ function getSharedHeadlessContext() {
 export class PlaywrightSessionManager implements BrowserSessionFactory {
   async acquire(windowLabel: string): Promise<AcquiredBrowserSession> {
     await ensureSharedChromeProcess();
+    await ensureAtLeastOneTab(CHROME_DEBUG_PORT);
 
     // OSレベルのウィンドウタイトルはPlaywrightから制御できないため、
     // windowLabelはUI側の active-runs-panel での表示判別にのみ使う（Step13）。
