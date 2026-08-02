@@ -1,0 +1,25 @@
+[Unit]
+Description=formstarter2 (Next.js app)
+After=network.target postgresql.service formstarter2-xvfb.service
+Requires=formstarter2-xvfb.service
+
+[Service]
+Type=simple
+# <APP_USER>/<APP_DIR> はデプロイ時に実際のユーザー名・配置パスへ置き換える。
+User=<APP_USER>
+WorkingDirectory=<APP_DIR>
+# DISPLAYがこのプロセスに設定されていることで、spawnした実ChromeがXvfbの仮想画面
+# （formstarter2-xvfb.service）に描画する。コード側の変更は不要——spawn()は
+# 親プロセス(このサービス)の環境変数をそのまま子プロセスへ引き継ぐ。
+Environment=DISPLAY=:99
+Environment=NODE_ENV=production
+Environment=PORT=<APP_PORT>
+# DATABASE_URL / AUTH_SECRET / FIELD_CLASSIFIER_MODEL 等の秘密情報はこのファイル
+# （リポジトリの外、サーバー上にのみ置く）から読み込む。中身は.envと同じ形式。
+EnvironmentFile=/etc/formstarter2/env
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

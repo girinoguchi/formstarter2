@@ -1,0 +1,14 @@
+[Unit]
+Description=Virtual X11 display for formstarter2 (headed Chrome needs a display to render into)
+After=network.target
+
+[Service]
+Type=simple
+# :99 は他のXディスプレイと衝突しない番号を選んだだけ（VPS上に他の用途が無ければ何でもよい）。
+# 1280x800x24: 解像度はVNCで見る時に無理なく確認できるサイズにしている。
+ExecStart=/usr/bin/Xvfb :99 -screen 0 1280x800x24 -nolisten tcp
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

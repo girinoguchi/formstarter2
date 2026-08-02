@@ -1,0 +1,18 @@
+[Unit]
+Description=VNC server exposing formstarter2's virtual display (:99) for remote viewing
+After=formstarter2-xvfb.service
+Requires=formstarter2-xvfb.service
+
+[Service]
+Type=simple
+# -rfbport 5999: formstarterApp等、VPS上の他サービスとポートが衝突しないよう専用ポートを割り当てる。
+# -localhost: 127.0.0.1にしかbindしない——VNCそのものを外部に晒さず、SSHトンネル
+#             （ssh -L 5999:localhost:5999 user@vps）経由でのみアクセスさせるための必須設定。
+# -passwdfile: `x11vnc -storepasswd /etc/formstarter2/vnc.passwd` で事前に作成しておく。
+# -forever: 1回の接続で終了せず、切断後も待ち受け続ける。
+ExecStart=/usr/bin/x11vnc -display :99 -rfbport 5999 -localhost -forever -shared -passwdfile /etc/formstarter2/vnc.passwd
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
