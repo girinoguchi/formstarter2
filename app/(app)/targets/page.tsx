@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Link from "next/link";
 
@@ -77,6 +77,10 @@ export default function TargetsPage() {
 
   const [openCount, setOpenCount] = useState("3");
   const [isOpeningBatch, setIsOpeningBatch] = useState(false);
+  // stateだけだと、再レンダリング（disabled属性への反映）が間に合わないほど素早く連打・
+  // 連続タップされた場合に2回目のクリックがすり抜けてしまう。refは更新が同期的で
+  // 即座に判定に使えるため、ここでの二重実行防止に使う。
+  const isOpeningBatchRef = useRef(false);
   const [openBatchMessage, setOpenBatchMessage] = useState<string | null>(null);
   // 「開いているタブ」パネルと同じクエリ（キャッシュ共有）で、実際にブラウザで開いている
   // タブ数をライブに把握する——DB側の追跡がズレても実態と表示が食い違わないようにするため。
@@ -106,9 +110,11 @@ export default function TargetsPage() {
 
   async function handleOpenBatch() {
     if (!profileId) return;
+    if (isOpeningBatchRef.current) return;
     const count = Number(openCount);
     if (!Number.isInteger(count) || count < 1) return;
 
+    isOpeningBatchRef.current = true;
     setIsOpeningBatch(true);
     setOpenBatchMessage(null);
     try {
@@ -127,6 +133,7 @@ export default function TargetsPage() {
     } catch (e) {
       setOpenBatchMessage(e instanceof Error ? e.message : "開始に失敗しました");
     } finally {
+      isOpeningBatchRef.current = false;
       setIsOpeningBatch(false);
     }
   }
@@ -243,7 +250,6 @@ export default function TargetsPage() {
             {discoveredCount} / {openTabs?.length ?? 0}件
           </p>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm text-muted-foreground">送信可能なものを</span>
             <Input
               type="number"
               min={1}
