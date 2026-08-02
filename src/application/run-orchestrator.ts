@@ -25,6 +25,7 @@ import type { SentPageDetector } from "../domain/ports/sent-page-detector.port";
 import type { RunKind } from "../domain/value-objects/run-kind";
 
 const MAX_VALIDATION_RETRY_ATTEMPTS = 2;
+const MAX_ADDITIONAL_CONTACT_HOPS = 2;
 
 const NAV_TIMEOUT_MS = 30_000;
 const NAME_OR_LABEL_NAME_PATTERN = /name|氏名|お名前|担当者/i;
@@ -513,11 +514,11 @@ export class RunOrchestrator {
         return { ok: false, finalStatus: "NOT_SENDABLE", errorStep: "CONTACT_PAGE_NOT_FOUND" };
       }
 
-      const contactGoto = await headless.session.goto(contactPageUrl, { timeoutMs: NAV_TIMEOUT_MS });
+      let contactGoto = await headless.session.goto(contactPageUrl, { timeoutMs: NAV_TIMEOUT_MS });
       if (contactGoto.status === 404) {
         return { ok: false, finalStatus: "NOT_SENDABLE", errorStep: "CONTACT_PAGE_NOT_FOUND" };
       }
-      const contactBlockCheck = await this.checkBlocked(headless.session, contactGoto.status);
+      let contactBlockCheck = await this.checkBlocked(headless.session, contactGoto.status);
       if (contactBlockCheck.blocked) {
         return {
           ok: false,
@@ -527,7 +528,35 @@ export class RunOrchestrator {
         };
       }
 
-      const forms = await this.formParser.parseForms(headless.session);
+      let forms = await this.formParser.parseForms(headless.session);
+
+      // 「お問い合わせ」ページ自体にはフォームが無く、そこから更にもう1段階リンクを辿った先
+      // （多くは外部フォームサービスへの301リダイレクト等）に実フォームがある2段階構成のサイト
+      // が実データ（fujiiryoki.co.jp: /support/contact.html→/support/form/support.html→
+      // f.msgs.jpの外部フォーム）で確認できたため、フォームが見つからない間は追加でリンクを
+      // 辿って再確認する。同じURLへ戻るループや無限探索を避けるため訪問済みURLと上限で打ち切る。
+      const visitedContactUrls = new Set([contactPageUrl]);
+      for (let hop = 0; hop < MAX_ADDITIONAL_CONTACT_HOPS && (forms.length === 0 || !looksLikeContactForm(pickBestForm(forms))); hop++) {
+        const nextResult = await this.playwrightContactPageFinder.findContactPage(target.url, headless.session);
+        if (!nextResult.contactPageUrl || visitedContactUrls.has(nextResult.contactPageUrl)) break;
+
+        contactPageUrl = nextResult.contactPageUrl;
+        visitedContactUrls.add(contactPageUrl);
+
+        contactGoto = await headless.session.goto(contactPageUrl, { timeoutMs: NAV_TIMEOUT_MS });
+        if (contactGoto.status === 404) break;
+        contactBlockCheck = await this.checkBlocked(headless.session, contactGoto.status);
+        if (contactBlockCheck.blocked) {
+          return {
+            ok: false,
+            finalStatus: "BLOCKED",
+            errorStep: blockErrorStep(contactBlockCheck.kind),
+            errorMessage: contactBlockCheck.reason,
+          };
+        }
+        forms = await this.formParser.parseForms(headless.session);
+      }
+
       if (forms.length === 0 || !looksLikeContactForm(pickBestForm(forms))) {
         return { ok: false, finalStatus: "NOT_SENDABLE", errorStep: "NO_FORM_FOUND" };
       }
