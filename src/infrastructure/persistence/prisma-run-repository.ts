@@ -137,6 +137,15 @@ export class PrismaRunRepository implements RunRepository {
     return count > 0;
   }
 
+  async listTargetIdsWithOpenTab(): Promise<readonly string[]> {
+    const rows = await this.client.run.findMany({
+      where: { kind: "FILL", status: { in: ["AWAITING_SEND", "SENT"] }, closedAt: null },
+      select: { targetId: true },
+      distinct: ["targetId"],
+    });
+    return rows.map((r) => r.targetId);
+  }
+
   async listActive(filter?: { profileId?: string; kind?: RunKind }): Promise<readonly ActiveRunSummary[]> {
     // CONTEXT_KEPT_OPEN_RUN_STATUSES（AWAITING_SEND等での「タブを開いたまま」扱い）はFILLにしか
     // 意味がない。EXPLOREは可視タブを持たないため、NOT_SENDABLE等の終端statusをここに含めると

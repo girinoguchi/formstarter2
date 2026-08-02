@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getRunOrchestrator, getTargetRepository } from "../../../../src/lib/di";
+import { getRunOrchestrator, getRunRepository, getTargetRepository } from "../../../../src/lib/di";
 
 /**
  * 「送信可能」になっているターゲットのうち、指定件数だけをheadedタブで開く。
@@ -23,7 +23,14 @@ export async function POST(request: NextRequest) {
   }
 
   const readyTargets = await getTargetRepository().list({ profileId, status: "READY" });
-  const targetIds = readyTargets.slice(0, count).map((t) => t.id);
+
+  // Target.statusはタブが開いている間もREADYのままのため（「送信待ち」の誤解を招く表示を
+  // 避けるための設計）、READY一覧には既にタブが開いているターゲットも混ざる。事前に除外
+  // しないと、たまたま先頭に並んでいるものが全部既に開いていた場合、バッチ全体が重複防止
+  // ガードで弾かれて0件になってしまう実バグがあった。
+  const openTabTargetIds = new Set(await getRunRepository().listTargetIdsWithOpenTab());
+  const freshTargets = readyTargets.filter((t) => !openTabTargetIds.has(t.id));
+  const targetIds = freshTargets.slice(0, count).map((t) => t.id);
 
   const orchestrator = getRunOrchestrator();
   let opened = 0;
@@ -31,15 +38,14 @@ export async function POST(request: NextRequest) {
     try {
       // execute()はRun行の作成までしか待たない（fire-and-forget）ため、
       // ここでのawaitは新規タブの起動に軽い間隔を持たせる程度の意味しかない。
-      // Target.statusはタブが開いている間もREADYのままのため、既にタブが開いている
-      // ターゲットがこの一覧に紛れ込むことがある（execute()側のhasOpenTabガードで弾かれる）
-      // ——1件の重複がバッチ全体を止めないよう、失敗はログだけ残してスキップする。
       await orchestrator.execute(targetId);
       opened += 1;
     } catch (error) {
+      // 上で事前除外しているため通常ここには来ないが、念のため1件の失敗で
+      // バッチ全体を止めないようにする。
       console.error(`[open-batch] failed to open target ${targetId}:`, error);
     }
   }
 
-  return NextResponse.json({ opened, available: readyTargets.length });
+  return NextResponse.json({ opened, available: freshTargets.length });
 }

@@ -80,6 +80,14 @@ export interface RunRepository {
    */
   hasOpenTab(targetId: string): Promise<boolean>;
   /**
+   * 既にタブが開いたまま（AWAITING_SEND/SENT且つclosedAtがnull）のFILL Runを持つ
+   * ターゲットidを一括取得する。「まとめて開く」がREADY一覧から候補を選ぶ際、
+   * 1件ずつhasOpenTabを呼ぶ代わりにこれで事前に除外する——除外せずに選ぶと、
+   * 既にタブが開いているものばかり先頭に並んでいる場合、バッチ全体が
+   * 重複防止ガードで弾かれて0件になってしまう実バグがあった。
+   */
+  listTargetIdsWithOpenTab(): Promise<readonly string[]>;
+  /**
    * 実行中、または「送信待ち」等ブラウザが開いたままになっている可能性のあるRunを一覧する。
    * kindでEXPLORE（可視タブなし）/FILL（可視タブあり）を絞り込める。
    */
