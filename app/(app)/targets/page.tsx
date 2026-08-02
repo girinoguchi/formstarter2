@@ -23,6 +23,7 @@ import { ActiveRunsPanel } from "../../../src/ui/components/active-runs-panel";
 import { ExploringIndicator } from "../../../src/ui/components/exploring-indicator";
 import { TargetImportForm } from "../../../src/ui/components/target-import-form";
 import { TargetTable } from "../../../src/ui/components/target-table";
+import { useActiveRuns } from "../../../src/ui/hooks/use-active-runs";
 import { useImportBatches } from "../../../src/ui/hooks/use-import-batches";
 import { useAddTarget, useResetTargets, useTargets } from "../../../src/ui/hooks/use-targets";
 import { useActivateProfile, useProfileList } from "../../../src/ui/hooks/use-profiles";
@@ -77,6 +78,9 @@ export default function TargetsPage() {
   const [openCount, setOpenCount] = useState("3");
   const [isOpeningBatch, setIsOpeningBatch] = useState(false);
   const [openBatchMessage, setOpenBatchMessage] = useState<string | null>(null);
+  // 「開いているタブ」パネルと同じクエリ（キャッシュ共有）で、実際にブラウザで開いている
+  // タブ数をライブに把握する——DB側の追跡がズレても実態と表示が食い違わないようにするため。
+  const { data: openTabs } = useActiveRuns(profileId, "FILL");
 
   async function handleProfileChange(id: string) {
     setProfileId(id);
@@ -117,8 +121,8 @@ export default function TargetsPage() {
       if (!res.ok) throw new Error(body.error ?? "開始に失敗しました");
       setOpenBatchMessage(
         body.opened === 0
-          ? "送信可能な対象がありませんでした"
-          : `送信可能${body.available}件のうち${body.opened}件のタブを開きました`,
+          ? "新たに開けるターゲットがありませんでした"
+          : `送信可能${discoveredCount}件のうち${body.opened}件のタブを開きました`,
       );
     } catch (e) {
       setOpenBatchMessage(e instanceof Error ? e.message : "開始に失敗しました");
@@ -233,6 +237,10 @@ export default function TargetsPage() {
       <Card className="mb-6">
         <CardContent>
           <p className="mb-3 text-sm font-semibold">まとめて開く</p>
+          <p className="mb-3 text-sm text-muted-foreground">
+            送信可能（フォーム発見数）: {discoveredCount}件 / 現在ブラウザで開いているタブ:{" "}
+            {openTabs?.length ?? 0}件
+          </p>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm text-muted-foreground">送信可能なものを</span>
             <Input
