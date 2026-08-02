@@ -118,7 +118,7 @@ export default function TargetsPage() {
       setOpenBatchMessage(
         body.opened === 0
           ? "送信可能な対象がありませんでした"
-          : `${body.opened}件のタブを開きます（送信可能: ${body.available}件中）`,
+          : `送信可能${body.available}件のうち${body.opened}件のタブを開きました`,
       );
     } catch (e) {
       setOpenBatchMessage(e instanceof Error ? e.message : "開始に失敗しました");
