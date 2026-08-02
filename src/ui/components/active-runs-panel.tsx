@@ -25,7 +25,7 @@ export function ActiveRunsPanel({ profileId }: { profileId: string | null }) {
           {runs.map((run) => (
             <li key={run.id} className="flex items-center gap-3 text-sm">
               <span className="font-mono text-xs text-muted-foreground">{run.windowLabel ?? run.targetUrl}</span>
-              <RunStatusBadge status={run.status} />
+              {run.status !== "AWAITING_SEND" && <RunStatusBadge status={run.status} />}
               <Link href={`/targets/${run.targetId}`} className="text-primary hover:underline">
                 {run.targetCompanyName ?? run.targetUrl}
               </Link>
