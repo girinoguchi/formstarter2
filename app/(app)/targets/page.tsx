@@ -238,8 +238,9 @@ export default function TargetsPage() {
         <CardContent>
           <p className="mb-3 text-sm font-semibold">まとめて開く</p>
           <p className="mb-3 text-sm text-muted-foreground">
-            送信可能（フォーム発見数）: {discoveredCount}件 / 現在ブラウザで開いているタブ:{" "}
-            {openTabs?.length ?? 0}件
+            送信可能（フォーム発見数）/ 現在ブラウザで開いているタブ:
+            <br />
+            {discoveredCount} / {openTabs?.length ?? 0}件
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm text-muted-foreground">送信可能なものを</span>
