@@ -151,6 +151,51 @@ export function extractFormsInCurrentDocument(): ExtractedForm[] {
     return (known as readonly string[]).includes(inputType) ? (inputType as FieldType) : "other";
   }
 
+  /**
+   * 「姓：<input> 名：<input>」のように、姓・名（フリガナの場合はカナ姓・カナ名）の
+   * 2つの入力欄が同じ親要素の下にラベル要素も無く並んでいるフォーム
+   * （fujiiryoki.co.jpの外部フォームサービス埋め込み等の実データで確認）では、
+   * labelFor()の最終手段（親要素のテキストからinput等を除いたもの）が両方の入力欄に
+   * 「姓： 名：」という全く同じ結合テキストを返してしまい、どちらが姓でどちらが名か
+   * 区別できないまま両方UNKNOWNになる実バグがあった。同じ親を持ち、姓・名の両方を含む
+   * 同一のラベルを共有するtext入力が2つ並んでいる場合に限り、DOM順（姓が先・名が後）で
+   * 個別のラベルへ差し替える。フリガナ文脈（「カタカナ」等の語を含む）かどうかで
+   * 姓/名 と 姓（フリガナ）/名（フリガナ）を出し分ける——分類辞書側（alias-dictionary.ts）で
+   * それぞれLAST_NAME/FIRST_NAME、LAST_NAME_KANA/FIRST_NAME_KANAに一致させるため。
+   */
+  function splitNameLabelOverrides(elements: readonly Element[]): Map<Element, string> {
+    const overrides = new Map<Element, string>();
+    const groups = new Map<Element, { el: Element; label: string }[]>();
+
+    for (const el of elements) {
+      if (el.tagName.toLowerCase() !== "input") continue;
+      const inputType = (el.getAttribute("type") ?? "text").toLowerCase();
+      if (inputType !== "text" && inputType !== "") continue;
+
+      const label = labelFor(el);
+      if (!label || !label.includes("姓") || !label.includes("名")) continue;
+
+      const parent = el.parentElement;
+      if (!parent) continue;
+
+      const list = groups.get(parent) ?? [];
+      list.push({ el, label });
+      groups.set(parent, list);
+    }
+
+    for (const list of groups.values()) {
+      if (list.length !== 2) continue;
+      const [first, second] = list;
+      if (first.label !== second.label) continue;
+
+      const isKana = /カタカナ|カナ|かな/.test(first.label);
+      overrides.set(first.el, isKana ? "姓（フリガナ）" : "姓");
+      overrides.set(second.el, isKana ? "名（フリガナ）" : "名");
+    }
+
+    return overrides;
+  }
+
   let fieldIndex = 0;
   const forms = Array.from(document.querySelectorAll("form"));
   const results: ExtractedForm[] = [];
@@ -160,6 +205,7 @@ export function extractFormsInCurrentDocument(): ExtractedForm[] {
     const formSelector = `form[data-fs-form-idx="${formIndex}"]`;
 
     const elements = Array.from(form.querySelectorAll("input, textarea, select, button"));
+    const labelOverrides = splitNameLabelOverrides(elements);
 
     const fields = elements.map((el) => {
       // React等のクライアントサイド再レンダリングでDOMノードが差し替わると、
@@ -199,7 +245,7 @@ export function extractFormsInCurrentDocument(): ExtractedForm[] {
         name: el.getAttribute("name"),
         id: el.getAttribute("id"),
         placeholder: el.getAttribute("placeholder"),
-        label: labelFor(el),
+        label: labelOverrides.get(el) ?? labelFor(el),
         required: el.hasAttribute("required"),
         value: el.getAttribute("value"),
         ariaLabel: el.getAttribute("aria-label"),

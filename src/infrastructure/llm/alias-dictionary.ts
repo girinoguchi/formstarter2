@@ -16,6 +16,19 @@ export const ALIAS_RULES: readonly AliasRule[] = [
     patterns: [/郵便番号/, /〒/, /zip\s*code/i, /postal\s*code/i, /postcode/i],
   },
   {
+    // フリガナ欄が「姓：　名：」のように1つの見出しの下に2つの入力欄へ分かれているケース
+    // (fujiiryoki.co.jpの外部フォームサービス埋め込み等の実データで確認)、dom-form-parser側で
+    // 「姓（フリガナ）」「名（フリガナ）」という合成ラベルを組み立てて渡してくる。
+    // 汎用のFURIGANAパターン(/フリガナ/)より先に評価しないと、そちらに横取りされ
+    // 姓名どちらの欄かを区別できないまま同じ1つの結合フリガナ値が入ってしまう。
+    category: "LAST_NAME_KANA",
+    patterns: [/姓（フリガナ）/],
+  },
+  {
+    category: "FIRST_NAME_KANA",
+    patterns: [/名（フリガナ）/],
+  },
+  {
     category: "FURIGANA",
     patterns: [/フリガナ/, /ふりがな/, /かな/, /\bkana\b/i],
   },

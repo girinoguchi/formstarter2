@@ -4,6 +4,8 @@ export const FIELD_CATEGORIES = [
   "FULL_NAME",
   "FIRST_NAME",
   "LAST_NAME",
+  "FIRST_NAME_KANA",
+  "LAST_NAME_KANA",
   "FURIGANA",
   "EMAIL",
   "PHONE",

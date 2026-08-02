@@ -64,6 +64,10 @@ function resolveProfileValue(category: FieldCategory, profile: Profile): string 
       return profile.firstName || null;
     case "LAST_NAME":
       return profile.lastName || null;
+    case "FIRST_NAME_KANA":
+      return profile.firstNameKana || null;
+    case "LAST_NAME_KANA":
+      return profile.lastNameKana || null;
     case "FURIGANA":
       return profile.furigana || combineName(profile.lastNameKana, profile.firstNameKana);
     case "EMAIL":
@@ -238,6 +242,18 @@ export class PlaywrightFormFiller implements FormFiller {
     if (field.type === "radio") {
       const candidateText = `${field.label ?? ""} ${field.value ?? ""}`;
       if (normalize(candidateText).includes(normalize(value))) {
+        await session.check(field.selector, { timeoutMs: FIELD_FILL_TIMEOUT_MS, frameUrl });
+      }
+      return;
+    }
+
+    // 「ご用件」等のカテゴリ選択がradio/selectではなくcheckboxの複数選択肢（1つの選択肢
+    // ＝1つのフィールド）として実装されているフォームがある（fujiiryoki.co.jp等の実データ
+    // で確認）。selectと同様、profile.inquiryTypeに一致する選択肢が無ければ「その他/
+    // お問い合わせ」的な選択肢にフォールバックする。
+    if (field.type === "checkbox" && category === "INQUIRY_TYPE") {
+      const candidateText = `${field.label ?? ""} ${field.value ?? ""}`;
+      if (normalize(candidateText).includes(normalize(value)) || OTHER_OPTION_PATTERN.test(candidateText)) {
         await session.check(field.selector, { timeoutMs: FIELD_FILL_TIMEOUT_MS, frameUrl });
       }
     }
