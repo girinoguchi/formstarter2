@@ -137,6 +137,9 @@ export class RunOrchestrator {
     for (const run of trackable) {
       const live = openById.get(run.cdpTargetId as string);
       if (!live) {
+        // Target.statusはタブが開いている間もREADYのままなので、ここで戻す必要はない
+        // （titleで「送信完了」を検知できないまま閉じられた場合、本当に送信したかは
+        // 分からないが、READY表示のままにしておくことで再実行できる状態を保つ）。
         await this.runRepository.markClosed(run.id).catch((error: unknown) => {
           console.error(`[RunOrchestrator] reconcileOpenTabs markClosed failed for run ${run.id}:`, error);
         });
@@ -178,6 +181,14 @@ export class RunOrchestrator {
     if (!target) throw new Error(`Target not found: ${targetId}`);
     if (kind === "FILL" && !target.contactPageUrl) {
       throw new Error(`Target ${targetId} is not READY yet (探索が完了していません)`);
+    }
+    // Target.statusはタブが開いている間もREADY表示のままにしている（送信したかどうかを
+    // 確実に検知できないため、確認できない限り「送信待ち」と表示すること自体が誤解を
+    // 招くという判断）。そのためstatusだけでは「既にタブが開いているか」を判定できず、
+    // 同じターゲットに対して重複してタブを開いてしまう（「まとめて開く」再実行等）のを
+    // 別途Runテーブルで防ぐ。
+    if (kind === "FILL" && (await this.runRepository.hasOpenTab(targetId))) {
+      throw new Error(`Target ${targetId} already has an open tab awaiting send`);
     }
 
     await this.targetRepository.updateStatus(targetId, "RUNNING");
@@ -444,15 +455,18 @@ export class RunOrchestrator {
       );
 
       // 送信ボタンをクリックするコードパスはこのクラス・FormFillerのどちらにも存在しない。
-      // ここでは「送信待ち」であることをUI/ログに記録し、ブラウザは開いたまま人間の操作を待つ。
-      // cdpTargetIdをここで保存しておき、detach後もreconcileOpenTabs()でタブの生死・
-      // 遷移を軽量に追跡できるようにする。
+      // ここでは「送信待ち」であることをRun.status/ログに記録し、ブラウザは開いたまま
+      // 人間の操作を待つ。cdpTargetIdをここで保存しておき、detach後もreconcileOpenTabs()
+      // でタブの生死・遷移を軽量に追跡できるようにする。
+      // Target.status（一覧に表示される方）は送信可能(READY)のままにする——送信したか
+      // どうかを確実に検知できないため、確認できない限り「送信待ち」と表示すること自体が
+      // 誤解を招くという判断（重複してタブを開かないための防止策はhasOpenTab側で別途行う）。
       finalStatus = "AWAITING_SEND";
       await this.runRepository.updateStatus(run.id, finalStatus, {
         finishedAt: new Date(),
         cdpTargetId: acquired.cdpTargetId ?? undefined,
       });
-      await this.targetRepository.updateStatus(target.id, finalStatus);
+      await this.targetRepository.updateStatus(target.id, "READY");
       await this.runRepository.appendLog(run.id, "INFO", "AWAITING_SEND", "送信待ち — 人間の操作をお待ちください");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

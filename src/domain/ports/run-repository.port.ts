@@ -73,6 +73,13 @@ export interface RunRepository {
   findDetailById(runId: string): Promise<RunDetail | null>;
   listByTarget(targetId: string): Promise<readonly Run[]>;
   /**
+   * 指定ターゲットに対して、まだ人間に閉じられていないFILL Run（AWAITING_SEND/SENT且つ
+   * closedAtがnull）があるかどうか。Target.statusはタブが開いている間もREADYのままにして
+   * いるため（誤解を招く「送信待ち」表示を避けるため）、statusだけでは重複実行を防げない
+   * ——この判定を別途Runテーブルで行う。
+   */
+  hasOpenTab(targetId: string): Promise<boolean>;
+  /**
    * 実行中、または「送信待ち」等ブラウザが開いたままになっている可能性のあるRunを一覧する。
    * kindでEXPLORE（可視タブなし）/FILL（可視タブあり）を絞り込める。
    */

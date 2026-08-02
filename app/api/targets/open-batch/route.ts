@@ -26,11 +26,20 @@ export async function POST(request: NextRequest) {
   const targetIds = readyTargets.slice(0, count).map((t) => t.id);
 
   const orchestrator = getRunOrchestrator();
+  let opened = 0;
   for (const targetId of targetIds) {
-    // execute()はRun行の作成までしか待たない（fire-and-forget）ため、
-    // ここでのawaitは新規タブの起動に軽い間隔を持たせる程度の意味しかない。
-    await orchestrator.execute(targetId);
+    try {
+      // execute()はRun行の作成までしか待たない（fire-and-forget）ため、
+      // ここでのawaitは新規タブの起動に軽い間隔を持たせる程度の意味しかない。
+      // Target.statusはタブが開いている間もREADYのままのため、既にタブが開いている
+      // ターゲットがこの一覧に紛れ込むことがある（execute()側のhasOpenTabガードで弾かれる）
+      // ——1件の重複がバッチ全体を止めないよう、失敗はログだけ残してスキップする。
+      await orchestrator.execute(targetId);
+      opened += 1;
+    } catch (error) {
+      console.error(`[open-batch] failed to open target ${targetId}:`, error);
+    }
   }
 
-  return NextResponse.json({ opened: targetIds.length, available: readyTargets.length });
+  return NextResponse.json({ opened, available: readyTargets.length });
 }
