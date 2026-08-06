@@ -14,7 +14,21 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3300](http://localhost:3300) with your browser to see the result.
+
+### ポート（ローカル開発）
+
+開発機では他プロジェクトと同時に立ち上げることが多いため、このプロジェクトは
+混み合う3000番台前半・5432を避けて専用の番号を使う。
+
+| 用途 | ポート | 備考 |
+| --- | --- | --- |
+| アプリ（`npm run dev`） | 3300 | `server.ts`の既定値。`PORT`で上書き可 |
+| PostgreSQL | 5433 | `postgresql@16`（`brew services`で常駐）。5432はDockerの`ridge_db`が占有 |
+
+Postgresが落ちている状態で`localhost:5432`へ繋ぐと、別プロジェクトのDockerコンテナに
+当たって`SASL: ... client password must be a string`で全ページが500になる。
+その場合は`brew services list`で`postgresql@16`が`started`か確認する。
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

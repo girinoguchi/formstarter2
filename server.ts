@@ -18,7 +18,10 @@ import { SESSION_COOKIE_NAME, verifySessionToken } from "./src/lib/auth-edge";
  */
 
 const dev = process.env.NODE_ENV !== "production";
-const port = Number(process.env.PORT) || 3000;
+// 既定値は3000ではなく3300。開発機では他プロジェクトが3000〜3002を使っていることが多く、
+// EADDRINUSEで起動できないため、このプロジェクト専用の番号を確保している。
+// VPSではsystemd（deploy/systemd/formstarter2-app.service）がPORTを明示指定するので影響しない。
+const port = Number(process.env.PORT) || 3300;
 
 const app = next({ dev });
 const handle = app.getRequestHandler();
