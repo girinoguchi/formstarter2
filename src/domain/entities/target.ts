@@ -8,6 +8,8 @@ export interface Target {
   contactPageUrl: string | null;
   importBatchId: string | null;
   profileId: string;
+  /** このURLを追加した本人。Profileは共有されるが、リストは共有されない。 */
+  ownerId: string;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;

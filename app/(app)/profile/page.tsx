@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { ProfileForm } from "../../../src/ui/components/profile-form";
+import { ProfileMembers } from "../../../src/ui/components/profile-members";
 import { ProfileOnboarding } from "../../../src/ui/components/profile-onboarding";
 import { ProfileSwitcher } from "../../../src/ui/components/profile-switcher";
 import { useProfileList } from "../../../src/ui/hooks/use-profiles";
@@ -60,6 +61,8 @@ export default function ProfilePage() {
       </div>
 
       <ProfileSwitcher activeId={activeId} onActiveChange={setActiveId} />
+
+      {activeId && <ProfileMembers profileId={activeId} />}
 
       {activeId && <ProfileForm profileId={activeId} />}
     </div>

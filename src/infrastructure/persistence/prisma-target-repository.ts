@@ -19,6 +19,7 @@ function toDomain(row: PrismaTarget): Target {
     contactPageUrl: row.contactPageUrl,
     importBatchId: row.importBatchId,
     profileId: row.profileId,
+    ownerId: row.ownerId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     deletedAt: row.deletedAt,
@@ -38,6 +39,7 @@ export class PrismaTargetRepository implements TargetRepository {
       where: {
         deletedAt: null,
         profileId: filter.profileId,
+        ownerId: filter.ownerId,
         ...(filter.status ? { status: filter.status } : {}),
         ...(filter.search
           ? {
@@ -64,15 +66,19 @@ export class PrismaTargetRepository implements TargetRepository {
     return batch.id;
   }
 
-  async listImportBatches(profileId: string): Promise<readonly ImportBatchSummary[]> {
+  async listImportBatches(
+    profileId: string,
+    ownerId: string,
+  ): Promise<readonly ImportBatchSummary[]> {
     const rows = await this.client.importBatch.findMany({
-      where: { targets: { some: { profileId, deletedAt: null } } },
+      where: { targets: { some: { profileId, ownerId, deletedAt: null } } },
       orderBy: { importedAt: "desc" },
       select: {
         id: true,
         fileName: true,
         importedAt: true,
-        _count: { select: { targets: { where: { profileId, deletedAt: null } } } },
+        // 取り込み件数も自分の分だけ数える（同じCSVを別の人が取り込んでいても混ざらない）。
+        _count: { select: { targets: { where: { profileId, ownerId, deletedAt: null } } } },
       },
     });
     return rows.map((row) => ({
@@ -94,6 +100,7 @@ export class PrismaTargetRepository implements TargetRepository {
             companyName: t.companyName ?? null,
             importBatchId: t.importBatchId ?? null,
             profileId: t.profileId,
+            ownerId: t.ownerId,
           },
         }),
       ),
@@ -119,7 +126,7 @@ export class PrismaTargetRepository implements TargetRepository {
     });
   }
 
-  async removeAllForProfile(profileId: string): Promise<void> {
-    await this.client.target.deleteMany({ where: { profileId } });
+  async removeAllForProfile(profileId: string, ownerId: string): Promise<void> {
+    await this.client.target.deleteMany({ where: { profileId, ownerId } });
   }
 }

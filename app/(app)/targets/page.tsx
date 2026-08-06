@@ -151,13 +151,21 @@ export default function TargetsPage() {
     return (
       <div className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
         <h1 className="mb-4 text-2xl font-semibold">リスト設定・送信実行</h1>
-        <p className="text-sm text-muted-foreground">
-          先に
-          <Link href="/profile" className="mx-1 text-primary hover:underline">
-            送信内容設定
-          </Link>
-          でプロジェクトを作成してください。
-        </p>
+        {/* 作業者は送信内容設定に入れないので、そちらへ案内しても出口がない。
+            管理者に割り当ててもらう必要があることを伝える。 */}
+        {isAdmin ? (
+          <p className="text-sm text-muted-foreground">
+            先に
+            <Link href="/profile" className="mx-1 text-primary hover:underline">
+              送信内容設定
+            </Link>
+            でプロジェクトを作成してください。
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            使えるプロジェクトがまだありません。管理者にプロジェクトの割り当てを依頼してください。
+          </p>
+        )}
       </div>
     );
   }

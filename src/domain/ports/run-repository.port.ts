@@ -90,9 +90,15 @@ export interface RunRepository {
   /**
    * 実行中、または「送信待ち」等ブラウザが開いたままになっている可能性のあるRunを一覧する。
    * kindでEXPLORE（可視タブなし）/FILL（可視タブあり）を絞り込める。
+   * ownerIdはTarget（＝URLを追加した本人）で絞る——Profileは共有されるので、
+   * プロジェクト単位で絞ると他人の実行まで入ってしまう。
    */
   listActive(filter?: { profileId?: string; ownerId?: string; kind?: RunKind }): Promise<readonly ActiveRunSummary[]>;
-  /** CSVエクスポート用にRunを新しい順で一覧する。profileIdで対象プロジェクトに絞り込み、
+  /** CSVエクスポート用にRunを新しい順で一覧する。profileId・ownerIdで対象を絞り込み、
    *  failedOnlyで送信不可・失敗・ブロック済みのみに絞り込める（「送信失敗一覧CSV」用）。 */
-  listForExport(filter?: { profileId?: string; failedOnly?: boolean }): Promise<readonly RunExportRow[]>;
+  listForExport(filter?: {
+    profileId?: string;
+    ownerId?: string;
+    failedOnly?: boolean;
+  }): Promise<readonly RunExportRow[]>;
 }

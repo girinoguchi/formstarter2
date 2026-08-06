@@ -6,10 +6,16 @@ export interface CreateTargetInput {
   companyName?: string | null;
   importBatchId?: string | null;
   profileId: string;
+  ownerId: string;
 }
 
+/**
+ * profileIdとownerIdは必ずセットで絞る。Profileは複数人で共有されるため、profileIdだけで
+ * 引くと同じプロジェクトを使う他の人のリスト・送信結果まで混ざる。
+ */
 export interface TargetListFilter {
   profileId: string;
+  ownerId: string;
   status?: TargetStatus;
   search?: string;
 }
@@ -32,7 +38,7 @@ export interface TargetRepository {
   findById(id: string): Promise<Target | null>;
   list(filter: TargetListFilter): Promise<readonly TargetListItem[]>;
   createImportBatch(fileName: string): Promise<string>;
-  listImportBatches(profileId: string): Promise<readonly ImportBatchSummary[]>;
+  listImportBatches(profileId: string, ownerId: string): Promise<readonly ImportBatchSummary[]>;
   createMany(targets: readonly CreateTargetInput[]): Promise<readonly Target[]>;
   updateStatus(
     id: string,
@@ -40,6 +46,6 @@ export interface TargetRepository {
     patch?: Partial<Pick<Target, "contactPageUrl">>,
   ): Promise<void>;
   softDelete(id: string): Promise<void>;
-  /** 指定プロジェクトの全ターゲットを削除する（「全件リセット」用）。 */
-  removeAllForProfile(profileId: string): Promise<void>;
+  /** 指定プロジェクトで自分が追加した分だけを削除する（「全件リセット」用）。 */
+  removeAllForProfile(profileId: string, ownerId: string): Promise<void>;
 }

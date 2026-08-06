@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getRunOrchestrator } from "../../../../../src/lib/di";
-import { requireOwnedTarget, requireSession } from "../../../../../src/lib/ownership";
+import { requireAccessibleTarget, requireSession } from "../../../../../src/lib/ownership";
 
 /**
  * target.contactPageUrl が未確定（＝まだ探索していない、または探索が
@@ -15,7 +15,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params;
 
-  const target = await requireOwnedTarget(id, guard.user.id);
+  const target = await requireAccessibleTarget(id, guard.user.id);
   if (!target) {
     return NextResponse.json({ error: "target not found" }, { status: 404 });
   }

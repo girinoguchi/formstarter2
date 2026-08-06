@@ -13,7 +13,11 @@ function csvEscape(value: string): string {
 export class CsvExportService {
   constructor(private readonly runRepository: RunRepository) {}
 
-  async exportRunsAsCsv(filter?: { profileId?: string; failedOnly?: boolean }): Promise<string> {
+  async exportRunsAsCsv(filter?: {
+    profileId?: string;
+    ownerId?: string;
+    failedOnly?: boolean;
+  }): Promise<string> {
     const rows = await this.runRepository.listForExport(filter);
 
     const lines = [CSV_HEADER.map(csvEscape).join(",")];

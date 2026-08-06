@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getTargetRepository } from "../../../src/lib/di";
-import { requireOwnedProfile, requireSession } from "../../../src/lib/ownership";
+import { requireAccessibleProfile, requireSession } from "../../../src/lib/ownership";
 
 export async function GET(request: NextRequest) {
   const guard = await requireSession();
@@ -12,10 +12,10 @@ export async function GET(request: NextRequest) {
   if (!profileId) {
     return NextResponse.json({ error: "profileId is required" }, { status: 400 });
   }
-  if (!(await requireOwnedProfile(profileId, guard.user.id))) {
+  if (!(await requireAccessibleProfile(profileId, guard.user.id))) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  const batches = await getTargetRepository().listImportBatches(profileId);
+  const batches = await getTargetRepository().listImportBatches(profileId, guard.user.id);
   return NextResponse.json({ batches });
 }

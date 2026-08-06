@@ -165,9 +165,11 @@ export class PrismaRunRepository implements RunRepository {
           }
         : { finishedAt: null };
 
+    // ownerIdはTarget側で見る。Profile.ownerIdで絞ると、共有プロジェクトを使っている
+    // 作業者のRunが「プロジェクト作成者のもの」として扱われてしまう。
     const targetFilter = {
       ...(filter?.profileId ? { profileId: filter.profileId } : {}),
-      ...(filter?.ownerId ? { profile: { ownerId: filter.ownerId } } : {}),
+      ...(filter?.ownerId ? { ownerId: filter.ownerId } : {}),
     };
 
     const rows = await this.client.run.findMany({
@@ -187,10 +189,16 @@ export class PrismaRunRepository implements RunRepository {
     }));
   }
 
-  async listForExport(filter?: { profileId?: string; failedOnly?: boolean }): Promise<readonly RunExportRow[]> {
+  async listForExport(
+    filter?: { profileId?: string; ownerId?: string; failedOnly?: boolean },
+  ): Promise<readonly RunExportRow[]> {
+    const targetFilter = {
+      ...(filter?.profileId ? { profileId: filter.profileId } : {}),
+      ...(filter?.ownerId ? { ownerId: filter.ownerId } : {}),
+    };
     const rows = await this.client.run.findMany({
       where: {
-        ...(filter?.profileId ? { target: { profileId: filter.profileId } } : {}),
+        ...(Object.keys(targetFilter).length > 0 ? { target: targetFilter } : {}),
         ...(filter?.failedOnly ? { status: { in: ["FAILED", "NOT_SENDABLE", "BLOCKED"] } } : {}),
       },
       include: { target: true, screenshots: { orderBy: { createdAt: "asc" } } },

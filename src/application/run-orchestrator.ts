@@ -266,22 +266,17 @@ export class RunOrchestrator {
     const windowLabel = target.companyName ?? safeHostname(target.url);
     await this.runRepository.updateStatus(run.id, "LAUNCHING_BROWSER", { startedAt: new Date(), windowLabel });
 
-    // このtargetの所有者（＝どの顧客のローカルエージェントへ中継するか）をprofile経由で
-    // 解決する。下の方で入力データ取得用に同じprofileIdをもう一度引いているが、そちらは
-    // 「プロフィール未設定時でもタブは開いて人間に見せる」という既存のタイミングを崩さない
-    // ために意図的に分けている（重複読み取りだが安価なfindUniqueなので許容する）。
+    // どの顧客のローカルエージェントへ中継するかはTarget.ownerId（＝このURLを追加した本人）
+    // で決める。Profileの作成者ではない——送信内容は管理者のものを共有していても、実際に
+    // ブラウザを開くのは作業した本人のPCでなければならない。
     //
-    // ここで投げうるエラー（ownerId解決不可・エージェント未接続等）は、ブラウザを
-    // 何も掴む前に発生する——tryブロックの外側なので、専用にcatchしてRunをFAILEDに
-    // 進めておかないと「LAUNCHING_BROWSERのまま二度と進まない」ゴーストRunになる
+    // ここで投げうるエラー（エージェント未接続等）は、ブラウザを何も掴む前に発生する
+    // ——tryブロックの外側なので、専用にcatchしてRunをFAILEDに進めておかないと
+    // 「LAUNCHING_BROWSERのまま二度と進まない」ゴーストRunになる
     // （エージェント未接続はSaaSの利用開始時に頻発する、想定内の失敗ケースのため）。
     let acquired: Awaited<ReturnType<BrowserSessionFactory["acquire"]>>;
     try {
-      const ownerProfile = await this.profileRepository.findByIdUnscoped(target.profileId);
-      if (!ownerProfile) {
-        throw new Error(`Profile not found for target ${target.id}`);
-      }
-      acquired = await this.headedSessionFactory.acquire(windowLabel, ownerProfile.ownerId);
+      acquired = await this.headedSessionFactory.acquire(windowLabel, target.ownerId);
       await this.runRepository.appendLog(run.id, "INFO", "BROWSER_LAUNCHED", "headedブラウザを起動しました");
     } catch (error) {
       const message = error instanceof Error ? error.message : "ブラウザの起動に失敗しました";

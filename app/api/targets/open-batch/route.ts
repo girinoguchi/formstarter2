@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getRunOrchestrator, getRunRepository, getTargetRepository } from "../../../../src/lib/di";
-import { requireOwnedProfile, requireSession } from "../../../../src/lib/ownership";
+import { requireAccessibleProfile, requireSession } from "../../../../src/lib/ownership";
 
 /**
  * 「送信可能」になっているターゲットのうち、指定件数だけをheadedタブで開く。
@@ -22,14 +22,14 @@ export async function POST(request: NextRequest) {
   if (!profileId) {
     return NextResponse.json({ error: "profileId is required" }, { status: 400 });
   }
-  if (!(await requireOwnedProfile(profileId, guard.user.id))) {
+  if (!(await requireAccessibleProfile(profileId, guard.user.id))) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
   if (!Number.isInteger(count) || count < 1 || count > 50) {
     return NextResponse.json({ error: "件数は1〜50の整数で指定してください" }, { status: 400 });
   }
 
-  const readyTargets = await getTargetRepository().list({ profileId, status: "READY" });
+  const readyTargets = await getTargetRepository().list({ profileId, ownerId: guard.user.id, status: "READY" });
 
   // Target.statusはタブが開いている間もREADYのままのため（「送信待ち」の誤解を招く表示を
   // 避けるための設計）、READY一覧には既にタブが開いているターゲットも混ざる。事前に除外
