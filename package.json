@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch server.ts",
+    "agent": "tsx agent/index.ts",
     "build": "next build",
     "start": "NODE_ENV=production tsx server.ts",
     "lint": "eslint",

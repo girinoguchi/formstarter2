@@ -7,6 +7,14 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Pagination,
@@ -34,9 +42,20 @@ const FAILED_LIKE_STATUSES = new Set(["FAILED", "NOT_SENDABLE", "BLOCKED"]);
 const PAGE_SIZE = 50;
 
 export default function TargetsPage() {
-  const { data: profiles } = useProfileList();
+  const { data: profiles, isLoading: isProfilesLoading } = useProfileList();
   const [profileId, setProfileId] = useState<string | null>(null);
   const activateProfile = useActivateProfile();
+  const [noProjectOpen, setNoProjectOpen] = useState(false);
+
+  // プロジェクトが1つも無いと、どの操作も紐付け先が無く成立しない。画面は出したまま、
+  // 操作しようとした時点で理由と行き先を伝える。
+  const hasNoProject = profiles !== undefined && profiles.length === 0;
+  /** プロジェクト未作成なら警告ダイアログを出して本来の処理を止める。 */
+  function blockedByNoProject(): boolean {
+    if (!hasNoProject) return false;
+    setNoProjectOpen(true);
+    return true;
+  }
 
   useEffect(() => {
     if (profileId === null && profiles && profiles.length > 0) {
@@ -90,12 +109,14 @@ export default function TargetsPage() {
   }
 
   async function handleAddUrl() {
+    if (blockedByNoProject()) return;
     if (!newUrl.trim() || !profileId) return;
     await addTarget.mutateAsync({ url: newUrl.trim(), profileId });
     setNewUrl("");
   }
 
   async function handleResetAll() {
+    if (blockedByNoProject()) return;
     if (!profileId) return;
     if (!confirm("このプロジェクトの全ターゲット（実行履歴・スクリーンショットを含む）を削除します。よろしいですか？")) return;
     try {
@@ -107,6 +128,7 @@ export default function TargetsPage() {
   }
 
   async function handleOpenBatch() {
+    if (blockedByNoProject()) return;
     if (!profileId) return;
     if (isOpeningBatchRef.current) return;
     const count = Number(openCount);
@@ -145,17 +167,12 @@ export default function TargetsPage() {
   const totalCount = allTargets?.length ?? 0;
   const discoveryRate = totalCount > 0 ? ((discoveredCount / totalCount) * 100).toFixed(1) : null;
 
-  if (profiles && profiles.length === 0) {
+  // 読込中に早期リターンしないと、プロジェクトの有無が確定する前に中身の無いUIが
+  // 一瞬描画される（送信内容設定ページと同じくスピナーで揃える）。
+  if (isProfilesLoading) {
     return (
-      <div className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
-        <h1 className="mb-4 text-2xl font-semibold">リスト設定・送信実行</h1>
-        <p className="text-sm text-muted-foreground">
-          先に
-          <Link href="/profile" className="mx-1 text-primary hover:underline">
-            送信内容設定
-          </Link>
-          でプロジェクトを作成してください。
-        </p>
+      <div className="flex items-center justify-center py-24">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
@@ -189,10 +206,10 @@ export default function TargetsPage() {
               className="max-w-sm flex-1"
               onKeyDown={(e) => e.key === "Enter" && handleAddUrl()}
             />
-            <Button onClick={handleAddUrl} disabled={!newUrl.trim() || !profileId}>
+            <Button onClick={handleAddUrl} disabled={!hasNoProject && (!newUrl.trim() || !profileId)}>
               追加
             </Button>
-            {profileId && (
+            {profileId ? (
               <TargetImportForm
                 profileId={profileId}
                 onImported={({ importedCount, skippedLineCount }) => {
@@ -201,6 +218,12 @@ export default function TargetsPage() {
                   );
                 }}
               />
+            ) : (
+              // 取込先が無い状態でファイル選択させると、選ばせた後に失敗させることになる。
+              // 押した時点で理由を伝えるため、同じ位置に出して先にダイアログを出す。
+              <Button variant="outline" onClick={() => blockedByNoProject()}>
+                CSVで一括取込
+              </Button>
             )}
             <Button variant="outline" className="text-destructive hover:bg-destructive/10" onClick={handleResetAll}>
               全件リセット
@@ -227,14 +250,14 @@ export default function TargetsPage() {
         <CardContent>
           <p className="mb-4 text-sm font-semibold text-primary">使い方</p>
           <div className="space-y-3 text-sm">
-            <HowToStep n={1} title="URLを追加" desc="追加・CSV取込どちらでも" />
-            <HowToStep n={2} title="自動で探索" desc="ウィンドウは開かず裏で確認" />
-            <HowToStep
+            <HowToStep n={1} title="会社ホームページのURLを登録 " desc="URLを貼り付けるか、CSVでまとめて取り込むだけ。問い合わせフォームは自動で見つかります。" />
+            <HowToStep n={2} title="「10件開く」を押す" desc="入力ずみのフォームが、ブラウザに10件まとめて開きます。1の内容を確認して送信 閉じたら、また「10件開く」。あとはこの繰り返しです。" />
+            {/* <HowToStep
               n={3}
               title="「開く」を押す、あるいは「まとめて開く」セクションから複数まとめて開く"
               desc="「送信可能」になった行のみ操作できます"
             />
-            <HowToStep n={4} title="送信" desc="開いたタブで内容確認して送信" />
+            <HowToStep n={4} title="送信" desc="開いたタブで内容確認して送信" /> */}
           </div>
         </CardContent>
       </Card>
@@ -257,7 +280,7 @@ export default function TargetsPage() {
               className="w-20"
             />
             <span className="text-sm text-muted-foreground">件だけタブで開く</span>
-            <Button onClick={handleOpenBatch} disabled={isOpeningBatch || !profileId}>
+            <Button onClick={handleOpenBatch} disabled={isOpeningBatch || (!hasNoProject && !profileId)}>
               {isOpeningBatch ? "開いています..." : "開く"}
             </Button>
             {openBatchMessage && <span className="text-sm text-muted-foreground">{openBatchMessage}</span>}
@@ -310,16 +333,31 @@ export default function TargetsPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-56"
           />
-          <Button variant="outline" asChild>
-            <a href={`/api/runs/export${profileId ? `?profileId=${profileId}` : ""}`}>
-              CSVエクスポート（会社名・メール・WEB）
-            </a>
-          </Button>
-          <Button variant="outline" asChild>
-            <a href={`/api/runs/export?failedOnly=1${profileId ? `&profileId=${profileId}` : ""}`}>
-              送信失敗一覧CSV（{failedCount}件）
-            </a>
-          </Button>
+          {hasNoProject ? (
+            // asChildのaタグはonClickで止めるとブラウザ差が出るため、遷移先を持たない
+            // ボタンに差し替える（押下でダイアログ）。
+            <>
+              <Button variant="outline" onClick={() => blockedByNoProject()}>
+                CSVエクスポート（会社名・メール・WEB）
+              </Button>
+              <Button variant="outline" onClick={() => blockedByNoProject()}>
+                送信失敗一覧CSV（{failedCount}件）
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" asChild>
+                <a href={`/api/runs/export${profileId ? `?profileId=${profileId}` : ""}`}>
+                  CSVエクスポート（会社名・メール・WEB）
+                </a>
+              </Button>
+              <Button variant="outline" asChild>
+                <a href={`/api/runs/export?failedOnly=1${profileId ? `&profileId=${profileId}` : ""}`}>
+                  送信失敗一覧CSV（{failedCount}件）
+                </a>
+              </Button>
+            </>
+          )}
         </div>
       </div>
       <p className="mb-4 text-xs text-muted-foreground">
@@ -371,6 +409,25 @@ export default function TargetsPage() {
           </Pagination>
         </div>
       )}
+
+      <Dialog open={noProjectOpen} onOpenChange={setNoProjectOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>プロジェクトがありません</DialogTitle>
+            <DialogDescription className="pt-1">
+              URLの追加・取込や送信は、プロジェクトに紐付けて行います。先に送信内容設定でプロジェクトを作成してください。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNoProjectOpen(false)}>
+              閉じる
+            </Button>
+            <Button asChild>
+              <Link href="/profile">送信内容設定へ</Link>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
