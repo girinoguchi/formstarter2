@@ -11,6 +11,23 @@ import { extractFormsInCurrentDocument, type ExtractedField } from "./dom-form-p
  * 前提の関数（document等のグローバルにのみ依存）なので、jsdomでdocument/CSSを
  * グローバルに差し込めばブラウザなしでも同じロジックを検証できる。
  */
+function runExtractOnHtml(html: string) {
+  const dom = new JSDOM(html);
+  const originalDocument = globalThis.document;
+  const originalGetComputedStyle = globalThis.getComputedStyle;
+  const originalCSS = (globalThis as { CSS?: typeof CSS }).CSS;
+  globalThis.document = dom.window.document;
+  globalThis.getComputedStyle = dom.window.getComputedStyle.bind(dom.window);
+  (globalThis as { CSS?: typeof CSS }).CSS = dom.window.CSS;
+  try {
+    return extractFormsInCurrentDocument();
+  } finally {
+    globalThis.document = originalDocument;
+    globalThis.getComputedStyle = originalGetComputedStyle;
+    (globalThis as { CSS?: typeof CSS }).CSS = originalCSS;
+  }
+}
+
 function runExtractOnFixture(fileName: string): ExtractedField[] {
   const html = fs.readFileSync(path.join(__dirname, "__fixtures__", fileName), "utf-8");
   const dom = new JSDOM(html);
@@ -87,5 +104,66 @@ describe("extractFormsInCurrentDocument", () => {
       // 未入力になる実バグがあった（kurashi-no-techo.co.jp本番データで確認）。
       expect(fieldByName(fields, "your-adrs")?.label).toContain("ご住所");
     });
+  });
+});
+
+// 2026-08-08の実障害(ashita-team.com)の回帰テスト。反自動化のための隠しフィールドを
+// 「本文」と誤判定して埋めていた。g-recaptcha-responseはトークンを壊し、
+// Pardotのpi_extra_field(ラベルがComments)はスパム判定を招く。
+describe("extractFormsInCurrentDocument: 触ってはいけないフィールドの除外", () => {
+  it("reCAPTCHAのトークン欄を候補に含めない", () => {
+    const forms = runExtractOnHtml(
+      `<form><input type="text" name="company"><textarea name="g-recaptcha-response"></textarea></form>`,
+    );
+
+    expect(forms[0].fields.map((f) => f.name)).toEqual(["company"]);
+  });
+
+  it("hCaptcha / Turnstile のトークン欄も含めない", () => {
+    const forms = runExtractOnHtml(
+      `<form><textarea name="h-captcha-response"></textarea><textarea name="cf-turnstile-response"></textarea><input name="company"></form>`,
+    );
+
+    expect(forms[0].fields.map((f) => f.name)).toEqual(["company"]);
+  });
+
+  it("Pardotのハニーポット(pi_extra_field)を候補に含めない", () => {
+    const forms = runExtractOnHtml(
+      `<form><input type="text" name="pi_extra_field"><input type="text" name="company"></form>`,
+    );
+
+    expect(forms[0].fields.map((f) => f.name)).toEqual(["company"]);
+  });
+
+  it("よくある名前のハニーポットも含めない", () => {
+    const forms = runExtractOnHtml(
+      `<form><input name="honeypot"><input name="_honey"><input name="company"></form>`,
+    );
+
+    expect(forms[0].fields.map((f) => f.name)).toEqual(["company"]);
+  });
+
+  it("display:noneの入力欄は含めない（名前が未知のハニーポット対策）", () => {
+    const forms = runExtractOnHtml(
+      `<form><input type="text" name="trap" style="display:none"><input type="text" name="company"></form>`,
+    );
+
+    expect(forms[0].fields.map((f) => f.name)).toEqual(["company"]);
+  });
+
+  it("hiddenと送信ボタンは残す（フォーム判別のスコアリングに使うため）", () => {
+    const forms = runExtractOnHtml(
+      `<form><input type="hidden" name="token"><input name="company"><input type="submit" value="送信する"></form>`,
+    );
+
+    expect(forms[0].fields.map((f) => f.name)).toEqual(["token", "company", null]);
+  });
+
+  it("form自身の可視性を返す", () => {
+    const visible = runExtractOnHtml(`<form><input name="a"></form>`);
+    const hidden = runExtractOnHtml(`<form style="display:none"><input name="a"></form>`);
+
+    expect(visible[0].visible).toBe(true);
+    expect(hidden[0].visible).toBe(false);
   });
 });

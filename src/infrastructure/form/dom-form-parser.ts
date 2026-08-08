@@ -7,6 +7,8 @@ export type ExtractedField = Omit<ParsedForm["fields"][number], "frameUrl">;
 export type ExtractedForm = {
   formSelector: string;
   fields: readonly ExtractedField[];
+  /** そのドキュメント内でのform要素自身の可視性。iframeごと隠れている場合は別途判定する。 */
+  visible: boolean;
 };
 
 /**
@@ -27,15 +29,26 @@ export class DomFormParser implements FormParser {
     }));
 
     const frameUrls = await session.listFrameUrls();
+    // フレーム内から自分のiframe要素の見え方は分からないため、親側で測って引き当てる。
+    // ashita-team.com（Pardotフォームを4つ埋め込み、表示中の1つ以外は0x0）のように、
+    // フレーム内では普通に見えるフォームが実際には畳まれている構成があるため必須。
+    const frameVisibility = await session
+      .evaluate<Record<string, boolean>>(extractIframeVisibility)
+      .catch(() => ({}) as Record<string, boolean>);
+
     const perFrame = await Promise.all(
       frameUrls.map(async (frameUrl) => {
         try {
           const forms = await session.evaluate<ExtractedForm[]>(extractFormsInCurrentDocument, undefined, {
             frameUrl,
           });
+          // 親のiframeが隠れていればフレーム内の見え方に関係なく不可視。
+          // 引き当てられなかった場合は従来どおり可視とみなす（判定できないだけで塞がない）。
+          const frameShown = frameVisibility[frameUrl] ?? true;
           return forms.map((form) => ({
             ...form,
             frameUrl,
+            visible: form.visible && frameShown,
             fields: form.fields.map((field) => ({ ...field, frameUrl })),
           }));
         } catch {
@@ -48,6 +61,40 @@ export class DomFormParser implements FormParser {
 
     return [...tagged, ...perFrame.flat()];
   }
+}
+
+/**
+ * iframeのsrc → その要素が人間の画面に見えているか。page.evaluate()に渡すため
+ * 外部変数を参照しない自己完結した関数にしている。
+ */
+export function extractIframeVisibility(): Record<string, boolean> {
+  const result: Record<string, boolean> = {};
+
+  for (const iframe of Array.from(document.querySelectorAll("iframe"))) {
+    const src = iframe.getAttribute("src");
+    if (!src) continue;
+
+    const style = getComputedStyle(iframe);
+    const rect = iframe.getBoundingClientRect();
+    const shown =
+      style.display !== "none" &&
+      style.visibility !== "hidden" &&
+      iframe.offsetParent !== null &&
+      rect.width > 0 &&
+      rect.height > 0;
+
+    // フレームURLはリダイレクト等でsrcと完全一致しないことがあるため、絶対URLに正規化して持つ。
+    let absolute = src;
+    try {
+      absolute = new URL(src, document.baseURI).toString();
+    } catch {
+      // 解決できない場合はsrcのまま引き当てを試みる。
+    }
+    result[absolute] = shown;
+    result[src] = shown;
+  }
+
+  return result;
 }
 
 /**
@@ -196,6 +243,42 @@ export function extractFormsInCurrentDocument(): ExtractedForm[] {
     return overrides;
   }
 
+  /**
+   * 触ってはいけないフィールドの名前。
+   *
+   * g-recaptcha-response: reCAPTCHAがトークンを書き込むtextarea。人間には見えず、
+   *   ここに問い合わせ本文を書き込むとトークンを壊して送信できなくなる。
+   * pi_extra_field: Pardotのハニーポット。ラベルが"Comments"のため本文と誤判定される。
+   *   人間には見えず、埋めると送信できてもスパム判定される。
+   * その他はよくあるハニーポットの命名。
+   */
+  const NEVER_FILL_NAMES = /^(g-recaptcha-response|h-captcha-response|cf-turnstile-response|pi_extra_field|honeypot|_honey|_honeypot)$/i;
+
+  /**
+   * レイアウト計算が行われている環境かどうか。jsdom（テスト）はgetBoundingClientRectが
+   * 常に0を返しoffsetParentもnullになるため、位置・サイズを根拠にすると全要素が
+   * 「隠れている」ことになってしまう。そこを区別するために一度だけ確かめる。
+   */
+  const hasLayout = document.body.getBoundingClientRect().height > 0;
+
+  /**
+   * 人間に見えているか。ハニーポットは「見えないのに入力欄」という形で仕込まれるため、
+   * 名前の列挙だけでは追いつかない。可視性で機械的に落とすのが本筋。
+   *
+   * ただし落とすのは「隠れていると確実に言える」ものだけにする。判定できないものまで
+   * 除外すると、本来入力すべき項目を取りこぼして送信できなくなる方向に倒れるため。
+   */
+  function isVisibleField(el: Element): boolean {
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
+    if (!hasLayout) return true;
+
+    // offsetParentがnullなのは、自分か祖先がdisplay:noneかposition:fixedのとき。
+    if ((el as HTMLElement).offsetParent === null && style.position !== "fixed") return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
   let fieldIndex = 0;
   const forms = Array.from(document.querySelectorAll("form"));
   const results: ExtractedForm[] = [];
@@ -204,7 +287,17 @@ export function extractFormsInCurrentDocument(): ExtractedForm[] {
     form.setAttribute("data-fs-form-idx", String(formIndex));
     const formSelector = `form[data-fs-form-idx="${formIndex}"]`;
 
-    const elements = Array.from(form.querySelectorAll("input, textarea, select, button"));
+    const elements = Array.from(form.querySelectorAll("input, textarea, select, button")).filter((el) => {
+      const name = el.getAttribute("name") ?? "";
+      if (NEVER_FILL_NAMES.test(name)) return false;
+
+      // ボタンとhiddenはスコアリング（送信ボタンらしさ）に使うので可視性では落とさない。
+      const tag = el.tagName.toLowerCase();
+      const type = (el.getAttribute("type") ?? "").toLowerCase();
+      if (tag === "button" || type === "submit" || type === "button" || type === "hidden") return true;
+
+      return isVisibleField(el);
+    });
     const labelOverrides = splitNameLabelOverrides(elements);
 
     const fields = elements.map((el) => {
@@ -254,7 +347,7 @@ export function extractFormsInCurrentDocument(): ExtractedForm[] {
       };
     });
 
-    results.push({ formSelector, fields });
+    results.push({ formSelector, fields, visible: isVisibleField(form) });
   });
 
   return results;

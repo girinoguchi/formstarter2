@@ -792,11 +792,18 @@ function safeHostname(url: string): string {
  * 1ページに複数<form>がある場合の判別。email項目・氏名項目・送信/確認らしいボタン文言の
  * 有無に加点し、項目数をベースにする単純なスコアリング。
  */
-function pickBestForm(forms: readonly ParsedForm[]): ParsedForm {
-  let best = forms[0];
+export function pickBestForm(forms: readonly ParsedForm[]): ParsedForm {
+  // 見えているフォームだけで判断する。同じ内容のフォームが複数埋め込まれ、表示中の1つ以外が
+  // 0x0で畳まれている構成（ashita-team.comのPardotフォーム4つ）では、可視性を見ないと
+  // 項目数が同じ非表示フォームが選ばれ、入力は成功するのに人の画面は空のままになる。
+  // 1つも可視でない場合は従来どおり全件から選ぶ（判定できないだけで送信を塞がない）。
+  const visible = forms.filter((f) => f.visible);
+  const candidates = visible.length > 0 ? visible : forms;
+
+  let best = candidates[0];
   let bestScore = scoreForm(best);
 
-  for (const form of forms.slice(1)) {
+  for (const form of candidates.slice(1)) {
     const score = scoreForm(form);
     if (score > bestScore) {
       best = form;

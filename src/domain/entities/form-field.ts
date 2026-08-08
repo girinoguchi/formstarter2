@@ -44,4 +44,10 @@ export interface ParsedForm {
   formSelector: string;
   fields: readonly ParsedFormField[];
   frameUrl: string | null;
+  /**
+   * 人間の画面に見えているフォームか。1ページに同じ内容のフォームが複数埋め込まれ、
+   * 表示中のものだけがサイズを持つ構成（タブ・アコーディオン内のPardotフォーム等）が
+   * あるため、どれを操作するかの判断に使う。
+   */
+  visible: boolean;
 }
