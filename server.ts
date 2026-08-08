@@ -45,12 +45,15 @@ app.prepare().then(() => {
   });
 
   const wss = new WebSocketServer({ noServer: true });
+  // Next.js自身もWebSocketを使う——開発時のHMR（/_next/webpack-hmr）がそれで、
+  // ここで切ってしまうとブラウザ側のdevクライアントが繋がらず、ホットリロードも
+  // 画面の操作も効かなくなる。/agent-ws以外はNext.jsのハンドラへそのまま委譲する。
+  const upgradeNext = app.getUpgradeHandler();
 
   httpServer.on("upgrade", (req, socket, head) => {
     const { pathname } = parse(req.url ?? "", true);
     if (pathname !== "/agent-ws") {
-      // このパス以外のアップグレードは扱わない（Next.js自体はApp RouterでWS未使用）。
-      socket.destroy();
+      void upgradeNext(req, socket, head);
       return;
     }
 
