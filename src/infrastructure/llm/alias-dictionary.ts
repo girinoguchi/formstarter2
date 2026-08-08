@@ -2,7 +2,18 @@ import type { FieldCategory } from "../../domain/value-objects/field-category";
 
 export interface AliasRule {
   category: FieldCategory;
+  /** label/name/id/placeholder/aria-labelを連結した文字列に対して照合する。 */
   patterns: readonly RegExp[];
+
+  /**
+   * 人に見えているラベルだけに対して照合するパターン。空白は前後除去・連続分は1つに畳む。
+   *
+   * 連結した文字列では「Name」のような一語のラベルを拾えない。^name$ は連結後の全体が
+   * ちょうど"name"のときしか当たらず、属性が1つでもあれば外れるためで、かといって
+   * 部分一致にすると file_name / campaign_name のような無関係な属性名まで拾ってしまう。
+   * ラベルは人が読む文字列なので、そこだけを見れば一語でも十分に判別できる。
+   */
+  labelPatterns?: readonly RegExp[];
 }
 
 /**
@@ -13,7 +24,9 @@ export interface AliasRule {
 export const ALIAS_RULES: readonly AliasRule[] = [
   {
     category: "POSTAL_CODE",
-    patterns: [/郵便番号/, /〒/, /zip\s*code/i, /postal\s*code/i, /postcode/i],
+    // "Post code"（スペース/ハイフン区切り）を明示的に持つ。これが無いと、後段の
+    // JOB_TITLEに追加した /\bpost\b/ が郵便番号欄を役職として拾ってしまう。
+    patterns: [/郵便番号/, /〒/, /zip\s*code/i, /postal\s*code/i, /post[\s-]*code/i],
   },
   {
     // フリガナ欄が「姓：　名：」のように1つの見出しの下に2つの入力欄へ分かれているケース
@@ -75,6 +88,9 @@ export const ALIAS_RULES: readonly AliasRule[] = [
   {
     category: "FULL_NAME",
     patterns: [/お名前/, /氏名/, /full[\s-]*name/i, /your[\s-]*name/i, /^name$/i],
+    // ラベルが「Name」だけの英語フォーム（cloud.swcms.netのsigmaxyz等）は、連結後が
+    // "Name name"になるため^name$に当たらず未入力のまま残っていた。
+    labelPatterns: [/^name$/i, /^your name$/i, /^full name$/i],
   },
   {
     // 「名」「姓」で姓名が別々の入力欄に分かれているフォーム（Marketo/HubSpot等の
@@ -104,7 +120,9 @@ export const ALIAS_RULES: readonly AliasRule[] = [
   },
   {
     category: "JOB_TITLE",
-    patterns: [/役職/, /肩書/, /job[\s-]*title/i, /\bposition\b/i],
+    // \bpost\b は "postal"/"postcode" には当たらない（tとaの間に境界が無いため）。
+    // それでも "Post code" だけは上のPOSTAL_CODEで先に捕まえておく必要がある。
+    patterns: [/役職/, /肩書/, /job[\s-]*title/i, /\bposition\b/i, /\bpost\b/i],
   },
   {
     category: "INDUSTRY",

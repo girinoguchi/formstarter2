@@ -43,6 +43,23 @@ function buildSearchText(field: ParsedFormField): string {
     .replace(/_/g, " ");
 }
 
+/**
+ * ラベル専用パターン用にラベル文字列を整える。
+ *
+ * ラベル要素には必須マーカーが一緒に入ることが多い（<label>Name <span>Required</span></label>
+ * のような構造で、textContentは"Name Required"になる）。一語のラベルを判別したいので、
+ * この種の飾りを落としてから照合する。連結文字列側(patterns)には手を入れない。
+ */
+function normalizeLabelForMatching(label: string | null): string {
+  if (!label) return "";
+  return label
+    .replace(/\s+/g, " ")
+    .replace(/[（(\[【]?\s*(必須|任意|required|optional|mandatory)\s*[)）\]】]?/gi, " ")
+    .replace(/[*＊※:：]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export class RuleBasedFieldClassifier implements FieldClassifier {
   async classify(
     fields: readonly ParsedFormField[],
@@ -53,9 +70,13 @@ export class RuleBasedFieldClassifier implements FieldClassifier {
 
   private classifyField(field: ParsedFormField): FieldClassification {
     const searchText = buildSearchText(field);
+    const labelText = normalizeLabelForMatching(field.label);
 
     for (const rule of ALIAS_RULES) {
-      if (rule.patterns.some((pattern) => pattern.test(searchText))) {
+      const matched =
+        rule.patterns.some((pattern) => pattern.test(searchText)) ||
+        (labelText !== "" && (rule.labelPatterns?.some((pattern) => pattern.test(labelText)) ?? false));
+      if (matched) {
         return {
           fieldSelector: field.selector,
           fieldLabel: field.label,

@@ -35,6 +35,32 @@ async function classifyFixture(fileName: string) {
 }
 
 describe("RuleBasedFieldClassifier against real site fixtures", () => {
+  // cloud.swcms.net(sigmaxyz)の英語フォーム。ラベルが「Post」「Name」の一語で、
+  // どちらも必須なのに未入力のまま残る実バグの回帰テスト。
+  //  - Post: JOB_TITLEの辞書に post が無かった
+  //  - Name: ^name$ は連結文字列("Name Required name")に当たらず、ラベル単独で
+  //          見る必要があった（さらにラベルに必須マーカー"Required"が混ざる）
+  it("classifies sigmaxyz's English form with single-word labels", async () => {
+    const categories = await classifyFixture("sigmaxyz-en-inquiry.html");
+
+    expect(categories.get("post")).toBe("JOB_TITLE");
+    expect(categories.get("name")).toBe("FULL_NAME");
+    expect(categories.get("company")).toBe("COMPANY_NAME");
+    expect(categories.get("email")).toBe("EMAIL");
+    expect(categories.get("email_confirmation")).toBe("EMAIL");
+    expect(categories.get("tel")).toBe("PHONE");
+    expect(categories.get("zipcode")).toBe("POSTAL_CODE");
+    expect(categories.get("address")).toBe("ADDRESS");
+    expect(categories.get("agree")).toBe("CONSENT_CHECKBOX");
+  });
+
+  it("leaves no required field unclassified on sigmaxyz's form", async () => {
+    const categories = await classifyFixture("sigmaxyz-en-inquiry.html");
+
+    expect([...categories.values()].filter((c) => c === "UNKNOWN")).toEqual([]);
+  });
+
+
   // oh-ami.com: table構造 + f_mail/f_mail_again という素の"mail"のname属性。
   // どちらも実際に本番データでUNKNOWN判定になっていたバグの回帰テスト。
   it("classifies oh-ami.com's table-layout form correctly", async () => {
