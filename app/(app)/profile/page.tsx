@@ -40,9 +40,9 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-5 px-4 pt-12 pb-20">
+    <div className="mx-auto max-w-3xl space-y-5 pb-12">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">送信内容設定</h1>
+        <h1 className="text-xl font-bold text-gray-800">送信内容設定</h1>
         <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
           フォーム自動入力に使う既定の会社情報・お問い合わせ内容を設定します。
         </p>

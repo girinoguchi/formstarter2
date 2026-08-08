@@ -178,8 +178,8 @@ export default function TargetsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
-      <h1 className="mb-6 text-2xl font-semibold">リスト設定・送信実行</h1>
+    <div>
+      <h1 className="mb-6 text-xl font-bold text-gray-800">リスト設定・送信実行</h1>
 
       <Card className="mb-6">
         <CardContent className="space-y-4">
