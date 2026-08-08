@@ -80,6 +80,7 @@ const PROFILE: Profile = {
   id: "p1",
   ownerId: "u1",
   name: "test",
+  isActive: true,
   companyName: "テスト株式会社",
   companyNameKana: "",
   lastName: "山田",

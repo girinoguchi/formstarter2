@@ -8,13 +8,9 @@ import { getProfileRepository, getRunRepository, getTargetRepository } from "./d
 export type SessionUser = NonNullable<Awaited<ReturnType<typeof getSession>>>;
 
 /**
- * データはProfile起点でスコープされる。誰がどのProfileを使えるかはProfileMember
- * （管理者が作ったProfileを作業者に割り当てる）が決め、isAdminはユーザー管理権限のみを
- * 表す——admin/作業者を問わず「ログイン中の自分に割り当てられたProfile配下かどうか」
- * だけで判定する。
- *
- * ここで見るのは「使えるか」だけ。送信内容の編集・改名・削除・割り当ての変更は作成者に
- * 限られ、その判定はProfileRepository側（ownerIdを取る各メソッド）が持つ。
+ * データはアカウントごとに完全分離（Profile.ownerId起点）。全アカウントが対等な
+ * 営業マン個人向けプロダクトのため役割による例外はなく、「ログイン中の自分が所有する
+ * Profile配下かどうか」だけで判定する。
  */
 export async function requireSession(): Promise<{ user: SessionUser } | { response: Response }> {
   const user = await getSession();
@@ -24,32 +20,25 @@ export async function requireSession(): Promise<{ user: SessionUser } | { respon
   return { user };
 }
 
-export async function requireAccessibleProfile(
+export async function requireOwnedProfile(
   profileId: string,
-  userId: string,
+  ownerId: string,
 ): Promise<Profile | null> {
-  return getProfileRepository().findById(profileId, userId);
+  return getProfileRepository().findById(profileId, ownerId);
 }
 
-/**
- * リスト（送信先URL）と送信結果は共有しない。Profileを使える人であっても、他人が追加した
- * Targetには触れない——プロジェクトへのアクセス権に加えて、追加者本人であることを求める。
- */
-export async function requireAccessibleTarget(
-  targetId: string,
-  userId: string,
-): Promise<Target | null> {
+/** targetId → profileId を辿り、そのProfileがownerIdの所有かを確認する。 */
+export async function requireOwnedTarget(targetId: string, ownerId: string): Promise<Target | null> {
   const target = await getTargetRepository().findById(targetId);
   if (!target) return null;
-  if (target.ownerId !== userId) return null;
-  const profile = await requireAccessibleProfile(target.profileId, userId);
+  const profile = await requireOwnedProfile(target.profileId, ownerId);
   return profile ? target : null;
 }
 
-/** runId → targetId → profileId を辿り、そのProfileをuserIdが使えるかを確認する。 */
-export async function requireAccessibleRun(runId: string, userId: string): Promise<Run | null> {
+/** runId → targetId → profileId を辿り、そのProfileがownerIdの所有かを確認する。 */
+export async function requireOwnedRun(runId: string, ownerId: string): Promise<Run | null> {
   const run = await getRunRepository().findById(runId);
   if (!run) return null;
-  const target = await requireAccessibleTarget(run.targetId, userId);
+  const target = await requireOwnedTarget(run.targetId, ownerId);
   return target ? run : null;
 }

@@ -5,7 +5,6 @@ import { createContext, useContext } from "react";
 export interface AuthUser {
   id: string;
   username: string;
-  isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthUser | null>(null);

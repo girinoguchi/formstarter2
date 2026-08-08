@@ -107,9 +107,8 @@ model Target {
   // プロジェクト（Profile）を削除すると、そのURL一覧・実行履歴も一緒に削除される。
   profileId      String
   profile        Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  // このURLを追加した本人。Profileは複数人で共有される（管理者が作った送信内容を作業者が
-  // 使う）が、リストと送信結果は共有しない——同じプロジェクトを使っていても、見えるのは
-  // 自分が追加したURLだけになる。headedブラウザをどの顧客PCへ中継するかもこの人で決まる。
+  // このURLを追加した本人。profileId経由でも同じ人に辿り着くが、headedブラウザを
+  // どの顧客PCへ中継するかの判定（RunOrchestrator）をJOINなしで済ませるために持つ。
   ownerId        String
   owner          User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   runs           Run[]
@@ -209,19 +208,15 @@ model RunFieldClassification {
 }
 
 // FormStarterappと同じ方式（bcryptjs + jose JWT、Sessionテーブルなし）を踏襲。
-// isAdminの真偽値のみで管理者/作業者を分ける（FormStarterappも同様の単純な2値ロール）。
+// 営業マン個人向けのプロダクトのため役割の区別は持たない——全アカウントが対等で、
+// それぞれ自分のプロジェクトだけを見て、自分で送信内容を設定する。
 model User {
-  id           String          @id @default(cuid())
-  username     String          @unique
+  id           String    @id @default(cuid())
+  username     String    @unique
   passwordHash String
-  isAdmin      Boolean         @default(false)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  /// 自分が作成したProfile（管理者のみが持つ）。
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   profiles     Profile[]
-  /// 使う権利を割り当てられたProfile。作成者本人の分もここに1件入る。
-  memberships  ProfileMember[]
-  /// 自分が追加した送信先URL。Profileを共有していても、これは共有されない。
   targets      Target[]
 }
 
@@ -229,11 +224,12 @@ model User {
 // 複数のProfileを名前付きで保持し、isActiveなものが自動入力・編集画面の対象になる。
 model Profile {
   id              String   @id @default(cuid())
-  // 作成者。送信内容の編集・改名・削除ができるのはこのユーザーだけ（＝管理者）。
-  // 「誰がこのProfileを使えるか」はownerIdではなくProfileMemberが決める。
+  // アカウントごとにデータを完全分離するための所有者。ProfileにぶらさがるTarget/Runは
+  // 全てここ経由でスコープされる（Target.profileId → この関連を辿って所有権を確認する）。
   ownerId         String
   owner           User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   name            String   @default("default")
+  isActive        Boolean  @default(false)
   companyName     String   @default("")
   companyNameKana String   @default("")
   lastName        String   @default("")
@@ -259,26 +255,6 @@ model Profile {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   targets         Target[]
-  members         ProfileMember[]
 
   @@index([ownerId])
-}
-
-// 管理者が作ったProfileを作業者に「使わせる」ための割り当て。
-// 作業者は送信内容を編集できず、リスト設定・送信実行でこのProfileを選んで使うだけ。
-//
-// isActiveをProfileではなくここに持たせているのは、1つのProfileを複数人が共有するため。
-// Profile側に持つと、誰かがプロジェクトを切り替えた瞬間に他の全員の選択まで変わってしまう。
-// 「今どのプロジェクトを選んでいるか」はユーザーごとの状態なので、割り当ての側に置く。
-model ProfileMember {
-  id        String   @id @default(cuid())
-  profileId String
-  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  isActive  Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  @@unique([profileId, userId])
-  @@index([userId])
 }

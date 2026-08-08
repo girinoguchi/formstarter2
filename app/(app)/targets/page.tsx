@@ -28,14 +28,12 @@ import { useImportBatches } from "../../../src/ui/hooks/use-import-batches";
 import { useAddTarget, useResetTargets, useTargets } from "../../../src/ui/hooks/use-targets";
 import { useActivateProfile, useProfileList } from "../../../src/ui/hooks/use-profiles";
 import { statusLabel } from "../../../src/ui/lib/status-labels";
-import { useAuth } from "../../../src/ui/providers/auth-provider";
 
 const ALL_STATUSES_VALUE = "ALL";
 const FAILED_LIKE_STATUSES = new Set(["FAILED", "NOT_SENDABLE", "BLOCKED"]);
 const PAGE_SIZE = 50;
 
 export default function TargetsPage() {
-  const { isAdmin } = useAuth();
   const { data: profiles } = useProfileList();
   const [profileId, setProfileId] = useState<string | null>(null);
   const activateProfile = useActivateProfile();
@@ -151,21 +149,13 @@ export default function TargetsPage() {
     return (
       <div className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
         <h1 className="mb-4 text-2xl font-semibold">リスト設定・送信実行</h1>
-        {/* 作業者は送信内容設定に入れないので、そちらへ案内しても出口がない。
-            管理者に割り当ててもらう必要があることを伝える。 */}
-        {isAdmin ? (
-          <p className="text-sm text-muted-foreground">
-            先に
-            <Link href="/profile" className="mx-1 text-primary hover:underline">
-              送信内容設定
-            </Link>
-            でプロジェクトを作成してください。
-          </p>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            使えるプロジェクトがまだありません。管理者にプロジェクトの割り当てを依頼してください。
-          </p>
-        )}
+        <p className="text-sm text-muted-foreground">
+          先に
+          <Link href="/profile" className="mx-1 text-primary hover:underline">
+            送信内容設定
+          </Link>
+          でプロジェクトを作成してください。
+        </p>
       </div>
     );
   }
@@ -320,20 +310,16 @@ export default function TargetsPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-56"
           />
-          {isAdmin && (
-            <>
-              <Button variant="outline" asChild>
-                <a href={`/api/runs/export${profileId ? `?profileId=${profileId}` : ""}`}>
-                  CSVエクスポート（会社名・メール・WEB）
-                </a>
-              </Button>
-              <Button variant="outline" asChild>
-                <a href={`/api/runs/export?failedOnly=1${profileId ? `&profileId=${profileId}` : ""}`}>
-                  送信失敗一覧CSV（{failedCount}件）
-                </a>
-              </Button>
-            </>
-          )}
+          <Button variant="outline" asChild>
+            <a href={`/api/runs/export${profileId ? `?profileId=${profileId}` : ""}`}>
+              CSVエクスポート（会社名・メール・WEB）
+            </a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href={`/api/runs/export?failedOnly=1${profileId ? `&profileId=${profileId}` : ""}`}>
+              送信失敗一覧CSV（{failedCount}件）
+            </a>
+          </Button>
         </div>
       </div>
       <p className="mb-4 text-xs text-muted-foreground">

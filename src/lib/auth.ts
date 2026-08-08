@@ -62,19 +62,3 @@ export async function getSession(): Promise<User | null> {
   return getUserRepository().findById(verified.userId);
 }
 
-/**
- * admin専用API routeの先頭で呼ぶガード。管理者でなければ返り値のresponseを
- * そのままreturnさせる（未ログインは401、ログイン済みだが作業者は403）。
- * middleware.tsは未ログインの排除のみ担当し、isAdmin判定はここで行う
- * （FormStarterappの「各admin route個別にisAdminチェック」パターンを踏襲）。
- */
-export async function requireAdmin(): Promise<{ user: User } | { response: Response }> {
-  const user = await getSession();
-  if (!user) {
-    return { response: Response.json({ error: "unauthorized" }, { status: 401 }) };
-  }
-  if (!user.isAdmin) {
-    return { response: Response.json({ error: "管理者のみ実行できます" }, { status: 403 }) };
-  }
-  return { user };
-}

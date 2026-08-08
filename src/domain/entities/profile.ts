@@ -1,9 +1,8 @@
-// isActiveは持たない——「今どのプロジェクトを選んでいるか」は共有相手ごとに違うため、
-// Profileではなく割り当て(ProfileMember)側の状態。ProfileSummaryが閲覧者視点で解決する。
 export interface Profile {
   id: string;
   ownerId: string;
   name: string;
+  isActive: boolean;
   companyName: string;
   companyNameKana: string;
   lastName: string;

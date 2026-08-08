@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getRunOrchestrator, getRunRepository } from "../../../../src/lib/di";
 import type { RunKind } from "../../../../src/domain/value-objects/run-kind";
-import { requireAccessibleProfile, requireSession } from "../../../../src/lib/ownership";
+import { requireOwnedProfile, requireSession } from "../../../../src/lib/ownership";
 
 // UIの「開いているタブ」パネルがこのエンドポイントを2秒おきにポーリングしている
 // ことに相乗りして、detach済みタブの生死・遷移の追跡（reconcileOpenTabs）も
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   if (!profileId) {
     return NextResponse.json({ error: "profileId is required" }, { status: 400 });
   }
-  if (!(await requireAccessibleProfile(profileId, guard.user.id))) {
+  if (!(await requireOwnedProfile(profileId, guard.user.id))) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 

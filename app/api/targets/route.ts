@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getExplorePool, getTargetRepository } from "../../../src/lib/di";
 import type { TargetStatus } from "../../../src/domain/value-objects/run-status";
 import { TARGET_STATUSES } from "../../../src/domain/value-objects/run-status";
-import { requireAccessibleProfile, requireSession } from "../../../src/lib/ownership";
+import { requireOwnedProfile, requireSession } from "../../../src/lib/ownership";
 
 export async function GET(request: NextRequest) {
   const guard = await requireSession();
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   if (!profileId) {
     return NextResponse.json({ error: "profileId is required" }, { status: 400 });
   }
-  if (!(await requireAccessibleProfile(profileId, guard.user.id))) {
+  if (!(await requireOwnedProfile(profileId, guard.user.id))) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
   if (!profileId) {
     return NextResponse.json({ error: "profileId is required" }, { status: 400 });
   }
-  if (!(await requireAccessibleProfile(profileId, guard.user.id))) {
+  if (!(await requireOwnedProfile(profileId, guard.user.id))) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 

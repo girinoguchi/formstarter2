@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getRunOrchestrator, getRunRepository, getTargetRepository } from "../../../../src/lib/di";
-import { requireAccessibleProfile, requireSession } from "../../../../src/lib/ownership";
+import { requireOwnedProfile, requireSession } from "../../../../src/lib/ownership";
 
 /**
  * 「送信可能」になっているターゲットのうち、指定件数だけをheadedタブで開く。
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   if (!profileId) {
     return NextResponse.json({ error: "profileId is required" }, { status: 400 });
   }
-  if (!(await requireAccessibleProfile(profileId, guard.user.id))) {
+  if (!(await requireOwnedProfile(profileId, guard.user.id))) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
   if (!Number.isInteger(count) || count < 1 || count > 50) {

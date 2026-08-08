@@ -1,6 +1,6 @@
 "use client";
 
-import { List, LogOut, Mail, Users } from "lucide-react";
+import { List, LogOut, Mail } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -10,16 +10,14 @@ interface NavItem {
   href: string;
   label: string;
   icon: typeof List;
-  adminOnly?: boolean;
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
-  { href: "/profile", label: "送信内容設定", icon: Mail, adminOnly: true },
+  { href: "/profile", label: "送信内容設定", icon: Mail },
   { href: "/targets", label: "リスト設定・送信実行", icon: List },
-  { href: "/admin", label: "ユーザー管理", icon: Users, adminOnly: true },
 ];
 
-export function Sidebar({ username, isAdmin }: { username: string; isAdmin: boolean }) {
+export function Sidebar({ username }: { username: string }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -38,7 +36,7 @@ export function Sidebar({ username, isAdmin }: { username: string; isAdmin: bool
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
-        {NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map(({ href, label, icon: Icon }) => {
+        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname?.startsWith(`${href}/`);
           return (
             <Link
@@ -57,10 +55,7 @@ export function Sidebar({ username, isAdmin }: { username: string; isAdmin: bool
       </nav>
 
       <div className="border-t border-white/10 px-3 py-4">
-        <p className="truncate px-4 text-xs text-white/60">
-          {username}
-          <span className="ml-1">{isAdmin ? "（管理者）" : "（作業者）"}</span>
-        </p>
+        <p className="truncate px-4 text-xs text-white/60">{username}</p>
         <button
           onClick={handleLogout}
           className="mt-2 flex w-full items-center gap-3 rounded-lg px-4 py-2 text-[13px] text-white/65 transition-colors hover:bg-white/10 hover:text-white"

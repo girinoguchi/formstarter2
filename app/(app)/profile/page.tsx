@@ -4,14 +4,11 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { ProfileForm } from "../../../src/ui/components/profile-form";
-import { ProfileMembers } from "../../../src/ui/components/profile-members";
 import { ProfileOnboarding } from "../../../src/ui/components/profile-onboarding";
 import { ProfileSwitcher } from "../../../src/ui/components/profile-switcher";
 import { useProfileList } from "../../../src/ui/hooks/use-profiles";
-import { useAuth } from "../../../src/ui/providers/auth-provider";
 
 export default function ProfilePage() {
-  const { isAdmin } = useAuth();
   const { data: profiles, isLoading } = useProfileList();
   const [activeId, setActiveId] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -22,15 +19,6 @@ export default function ProfilePage() {
       if (active) setActiveId(active.id);
     }
   }, [activeId, profiles]);
-
-  if (!isAdmin) {
-    return (
-      <div className="mx-auto w-full max-w-3xl px-4 pt-12 pb-20">
-        <h1 className="text-2xl font-bold text-foreground">送信内容設定</h1>
-        <p className="mt-4 text-sm text-muted-foreground">この画面は管理者のみ利用できます。</p>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (
@@ -61,8 +49,6 @@ export default function ProfilePage() {
       </div>
 
       <ProfileSwitcher activeId={activeId} onActiveChange={setActiveId} />
-
-      {activeId && <ProfileMembers profileId={activeId} />}
 
       {activeId && <ProfileForm profileId={activeId} />}
     </div>
