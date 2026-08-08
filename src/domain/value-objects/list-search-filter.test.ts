@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildQueryVariants,
   coreCompanyName,
   isExcludedUrl,
-  NEGATIVE_SITE_QUERY,
   titleMatchesCompany,
-  toListItems,
   toOrigin,
 } from "./list-search-filter";
 
@@ -62,65 +59,6 @@ describe("toOrigin", () => {
 
   it("解釈できない文字列はそのまま返す", () => {
     expect(toOrigin("not a url")).toBe("not a url");
-  });
-});
-
-describe("toListItems", () => {
-  it("同じドメインの別ページを1件にまとめる", () => {
-    const items = toListItems([
-      { title: "A社 会社概要", link: "https://a.co.jp/about" },
-      { title: "A社 お問い合わせ", link: "https://a.co.jp/contact" },
-      { title: "B社", link: "https://b.co.jp/" },
-    ]);
-
-    expect(items).toEqual([
-      { name: "A社 会社概要", url: "https://a.co.jp" },
-      { name: "B社", url: "https://b.co.jp" },
-    ]);
-  });
-
-  it("除外ドメインを取り除く", () => {
-    const items = toListItems([
-      { title: "PR", link: "https://prtimes.jp/x" },
-      { title: "A社", link: "https://a.co.jp/" },
-    ]);
-
-    expect(items.map((i) => i.url)).toEqual(["https://a.co.jp"]);
-  });
-
-  // 上位の検索結果ほど確度が高いので、並び順を崩さない。
-  it("検索順を保つ", () => {
-    const items = toListItems([
-      { title: "1", link: "https://one.co.jp/" },
-      { title: "2", link: "https://two.co.jp/" },
-      { title: "3", link: "https://three.co.jp/" },
-    ]);
-
-    expect(items.map((i) => i.name)).toEqual(["1", "2", "3"]);
-  });
-});
-
-describe("buildQueryVariants", () => {
-  it("言い換えを足して複数パターンにする", () => {
-    const variants = buildQueryVariants("東京 製造業");
-
-    expect(variants).toHaveLength(5);
-    expect(variants[0]).toBe(`東京 製造業 ${NEGATIVE_SITE_QUERY}`);
-    expect(variants[1]).toContain("東京 製造業 お問い合わせ");
-  });
-
-  // 「お問い合わせ 東京」で検索したのに「お問い合わせ 東京 お問い合わせ」を投げない。
-  it("既に含まれている語は重ねない", () => {
-    const variants = buildQueryVariants("東京 お問い合わせ");
-
-    expect(variants).toHaveLength(4);
-    expect(variants.some((v) => v.includes("お問い合わせ お問い合わせ"))).toBe(false);
-  });
-
-  it("全バリアントに除外クエリが付く", () => {
-    for (const v of buildQueryVariants("テスト")) {
-      expect(v).toContain("-site:prtimes.jp");
-    }
   });
 });
 

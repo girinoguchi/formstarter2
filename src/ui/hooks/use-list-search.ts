@@ -2,29 +2,9 @@
 
 import { useMutation } from "@tanstack/react-query";
 
-export interface ListSearchItem {
-  name: string;
-  url: string;
-}
-
 export interface ResolvedCompanyUrl {
   name: string;
   url: string | null;
-}
-
-export function useKeywordSearch() {
-  return useMutation({
-    mutationFn: async (keyword: string) => {
-      const res = await fetch("/api/list-search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyword }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "検索に失敗しました");
-      return body as { results: ListSearchItem[]; total: number };
-    },
-  });
 }
 
 export function useResolveCompanyUrls() {

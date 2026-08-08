@@ -17,48 +17,6 @@ function fakeClient(byQuery: Record<string, WebSearchResult[]> = {}) {
   return { client, calls };
 }
 
-describe("ListSearchService.searchByKeyword", () => {
-  it("言い換え5パターン × 3ページを取得する", async () => {
-    const { client, calls } = fakeClient();
-
-    await new ListSearchService(client).searchByKeyword("東京 製造業");
-
-    expect(calls).toHaveLength(15);
-    expect(new Set(calls.map((c) => c.page))).toEqual(new Set([1, 2, 3]));
-  });
-
-  it("除外ドメインを落とし、同じ会社を1件にまとめる", async () => {
-    const { client } = fakeClient({
-      "東京 製造業": [
-        { title: "A社 概要", link: "https://a.co.jp/about" },
-        { title: "A社 問い合わせ", link: "https://a.co.jp/contact" },
-        { title: "求人", link: "https://tenshoku.mynavi.jp/a" },
-        { title: "B社", link: "https://b.co.jp/" },
-      ],
-    });
-
-    const items = await new ListSearchService(client).searchByKeyword("東京 製造業");
-
-    expect(items).toEqual([
-      { name: "A社 概要", url: "https://a.co.jp" },
-      { name: "B社", url: "https://b.co.jp" },
-    ]);
-  });
-
-  // 1本でも落ちると全体が失敗する作りだと、十数リクエストを投げる検索は成立しない。
-  it("一部の検索が0件でも結果を返す", async () => {
-    const client: WebSearchClient = {
-      search: vi.fn(async (_q: string, page: number) =>
-        page === 1 ? [{ title: "A社", link: "https://a.co.jp/" }] : [],
-      ),
-    };
-
-    const items = await new ListSearchService(client).searchByKeyword("テスト");
-
-    expect(items).toEqual([{ name: "A社", url: "https://a.co.jp" }]);
-  });
-});
-
 describe("ListSearchService.resolveCompanyUrls", () => {
   it("「公式サイト」付きで見つかればそれを使い、2回目の検索はしない", async () => {
     const { client, calls } = fakeClient({

@@ -129,44 +129,6 @@ export function toOrigin(url: string): string {
  */
 export const NEGATIVE_SITE_QUERY: string = EXCLUDED_DOMAINS.map((d) => `-site:${d}`).join(" ");
 
-/** 1回の検索で拾える企業を増やすための言い換え。 */
-const QUERY_SUFFIXES: readonly string[] = ["お問い合わせ", "会社概要", "コーポレートサイト", "公式サイト"];
-
-export function buildQueryVariants(baseQuery: string): readonly string[] {
-  const base = baseQuery.trim();
-  const variants = [base];
-  for (const suffix of QUERY_SUFFIXES) {
-    if (!base.includes(suffix)) variants.push(`${base} ${suffix}`);
-  }
-  return variants.map((q) => `${q} ${NEGATIVE_SITE_QUERY}`);
-}
-
-export interface ListSearchItem {
-  name: string;
-  url: string;
-}
-
-/**
- * 検索結果を「企業サイトの一覧」に整える。除外・オリジン正規化・重複排除をまとめて行う。
- * 取得順（＝検索順位順）を保つので、上位の結果ほど前に残る。
- */
-export function toListItems(
-  results: readonly { title: string; link: string }[],
-): readonly ListSearchItem[] {
-  const seen = new Set<string>();
-  const items: ListSearchItem[] = [];
-
-  for (const result of results) {
-    if (isExcludedUrl(result.link)) continue;
-    const origin = toOrigin(result.link);
-    if (seen.has(origin)) continue;
-    seen.add(origin);
-    items.push({ name: result.title, url: origin });
-  }
-
-  return items;
-}
-
 /**
  * 検索結果が、その社名の会社のものと言えるか。
  *

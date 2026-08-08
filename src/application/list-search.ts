@@ -1,16 +1,10 @@
 import type { WebSearchClient } from "../domain/ports/web-search.port";
 import {
-  buildQueryVariants,
   isExcludedUrl,
   NEGATIVE_SITE_QUERY,
   titleMatchesCompany,
-  toListItems,
   toOrigin,
-  type ListSearchItem,
 } from "../domain/value-objects/list-search-filter";
-
-/** キーワード検索で1バリアントあたり取得するページ数。 */
-const PAGES_PER_VARIANT = 3;
 
 /** 企業名からのURL逆引きで、1リクエストに受け付ける上限（コストと処理時間の上限）。 */
 export const MAX_COMPANY_NAMES = 300;
@@ -25,22 +19,6 @@ export interface ResolvedCompanyUrl {
 
 export class ListSearchService {
   constructor(private readonly searchClient: WebSearchClient) {}
-
-  /**
-   * キーワードから企業サイトの一覧を作る。
-   * 言い換えクエリ×複数ページを一度に投げるのは、1回の検索で拾える企業数を増やすため。
-   */
-  async searchByKeyword(keyword: string): Promise<readonly ListSearchItem[]> {
-    const variants = buildQueryVariants(keyword);
-
-    const pages = await Promise.all(
-      variants.flatMap((query) =>
-        Array.from({ length: PAGES_PER_VARIANT }, (_, i) => this.searchClient.search(query, i + 1)),
-      ),
-    );
-
-    return toListItems(pages.flat());
-  }
 
   /**
    * 企業名から公式サイトのURLを引く。まず「公式サイト」付きで検索し、見つからなければ
