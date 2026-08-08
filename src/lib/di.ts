@@ -17,6 +17,7 @@ import { PlaywrightFormFiller } from "../infrastructure/form/form-filler";
 import { HeuristicSentPageDetector } from "../infrastructure/form/sent-page-detector";
 import { DomValidationErrorParser } from "../infrastructure/form/validation-error-parser";
 import { RuleBasedFieldClassifier } from "../infrastructure/llm/rule-based-classifier";
+import { PrismaNgEntryRepository } from "../infrastructure/persistence/prisma-ng-entry-repository";
 import { PrismaProfileRepository } from "../infrastructure/persistence/prisma-profile-repository";
 import { PrismaRunRepository } from "../infrastructure/persistence/prisma-run-repository";
 import { PrismaTargetRepository } from "../infrastructure/persistence/prisma-target-repository";
@@ -28,7 +29,8 @@ import { prisma } from "./prisma";
 // API route handlers はここ経由でのみ application/infrastructure を取得する。
 
 const targetRepository = new PrismaTargetRepository(prisma);
-const csvImportService = new CsvImportService(targetRepository);
+const ngEntryRepository = new PrismaNgEntryRepository(prisma);
+const csvImportService = new CsvImportService(targetRepository, ngEntryRepository);
 const profileRepository = new PrismaProfileRepository(prisma);
 const runRepository = new PrismaRunRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
@@ -58,6 +60,7 @@ const runOrchestrator = new RunOrchestrator(
   fieldClassifier,
   formFiller,
   profileRepository,
+  ngEntryRepository,
   validationErrorParser,
   confirmationPageDetector,
   sentPageDetector,
@@ -103,4 +106,8 @@ export function getCsvExportService() {
 
 export function getUserRepository() {
   return userRepository;
+}
+
+export function getNgEntryRepository() {
+  return ngEntryRepository;
 }

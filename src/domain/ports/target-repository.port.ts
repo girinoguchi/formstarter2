@@ -7,6 +7,9 @@ export interface CreateTargetInput {
   importBatchId?: string | null;
   profileId: string;
   ownerId: string;
+  /** NGリスト一致時にBLOCKEDで作るために使う。未指定なら既定のPENDING。 */
+  status?: TargetStatus;
+  blockReason?: string | null;
 }
 
 /**
@@ -45,6 +48,8 @@ export interface TargetRepository {
     status: TargetStatus,
     patch?: Partial<Pick<Target, "contactPageUrl">>,
   ): Promise<void>;
+  /** NGリスト一致でBLOCKEDにする（理由付き）。 */
+  block(id: string, reason: string): Promise<void>;
   softDelete(id: string): Promise<void>;
   /** 指定プロジェクトで自分が追加した分だけを削除する（「全件リセット」用）。 */
   removeAllForProfile(profileId: string, ownerId: string): Promise<void>;

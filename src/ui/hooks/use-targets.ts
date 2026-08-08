@@ -10,6 +10,8 @@ export interface TargetListItem {
   companyName: string | null;
   status: TargetStatus;
   contactPageUrl: string | null;
+  /** NGリスト一致でブロックした理由。該当しなければnull。 */
+  blockReason: string | null;
   profileId: string;
   createdAt: string;
   updatedAt: string;

@@ -100,6 +100,9 @@ model Target {
   url            String
   companyName    String?
   status         TargetStatus @default(PENDING)
+  /// BLOCKEDにした理由（現状はNGリスト一致のみ）。実行前に弾いているのでRunが無く、
+  /// 一覧の失敗理由（直近Runのerror）では説明できないため個別に持つ。
+  blockReason    String?
   contactPageUrl String?
   importBatchId  String?
   importBatch    ImportBatch? @relation(fields: [importBatchId], references: [id])
@@ -218,6 +221,22 @@ model User {
   updatedAt    DateTime  @updatedAt
   profiles     Profile[]
   targets      Target[]
+  ngEntries    NgEntry[]
+}
+
+// 送信してはいけないドメイン・URL。アカウント単位で持ち、そのユーザーの全プロジェクトに効く
+// （FormStarterappのGlobalNgCompanyに相当。あちらは1インスタンス共通だが、こちらは
+// アカウントごとにデータが完全分離されているのでownerIdで区切る）。
+model NgEntry {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  /// ドメインまたはURLの一部。完全一致ではなく部分一致で照合する。
+  value     String
+  createdAt DateTime @default(now())
+
+  @@unique([ownerId, value])
+  @@index([ownerId])
 }
 
 // FormStarterapp（/dashboard の Profile）と同じフィールド構成・プロジェクト切替の仕組みに揃えている。

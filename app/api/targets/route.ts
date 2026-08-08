@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getExplorePool, getTargetRepository } from "../../../src/lib/di";
+import { isNgUrl, NG_BLOCK_REASON } from "../../../src/domain/value-objects/ng-match";
+import { getExplorePool, getNgEntryRepository, getTargetRepository } from "../../../src/lib/di";
 import type { TargetStatus } from "../../../src/domain/value-objects/run-status";
 import { TARGET_STATUSES } from "../../../src/domain/value-objects/run-status";
 import { requireOwnedProfile, requireSession } from "../../../src/lib/ownership";
@@ -54,11 +55,20 @@ export async function POST(request: NextRequest) {
   }
 
   const companyName = typeof body.companyName === "string" ? body.companyName.trim() : null;
+  const isNg = isNgUrl(url, await getNgEntryRepository().listValues(guard.user.id));
   const [target] = await getTargetRepository().createMany([
-    { url, companyName, profileId, ownerId: guard.user.id },
+    {
+      url,
+      companyName,
+      profileId,
+      ownerId: guard.user.id,
+      ...(isNg ? { status: "BLOCKED" as const, blockReason: NG_BLOCK_REASON } : {}),
+    },
   ]);
 
-  if (target) getExplorePool().enqueueMany([target.id]);
+  // NGは探索もしない——フォームを見つけても開けないので、時間と対向サイトへの
+  // アクセスを無駄に使うだけになる。
+  if (target && !isNg) getExplorePool().enqueueMany([target.id]);
 
   return NextResponse.json({ target }, { status: 201 });
 }

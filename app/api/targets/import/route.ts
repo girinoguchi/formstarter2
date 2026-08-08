@@ -31,7 +31,9 @@ export async function POST(request: NextRequest) {
 
   // CSVを読み込んだ瞬間（インポート直後）に自動で全件を探索キューへ投入する（可視タブは開かない）。
   // 送信可能と確認できたものだけが「READY」になり、一覧の「入力」ボタンで開けるようになる。
-  getExplorePool().enqueueMany(result.targets.map((t) => t.id));
+  getExplorePool().enqueueMany(
+    result.targets.filter((t) => t.status !== "BLOCKED").map((t) => t.id),
+  );
 
   return NextResponse.json(result, { status: 201 });
 }

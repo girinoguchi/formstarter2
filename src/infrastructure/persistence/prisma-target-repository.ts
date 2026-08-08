@@ -17,6 +17,7 @@ function toDomain(row: PrismaTarget): Target {
     companyName: row.companyName,
     status: row.status as TargetStatus,
     contactPageUrl: row.contactPageUrl,
+    blockReason: row.blockReason,
     importBatchId: row.importBatchId,
     profileId: row.profileId,
     ownerId: row.ownerId,
@@ -101,6 +102,8 @@ export class PrismaTargetRepository implements TargetRepository {
             importBatchId: t.importBatchId ?? null,
             profileId: t.profileId,
             ownerId: t.ownerId,
+            ...(t.status ? { status: t.status } : {}),
+            ...(t.blockReason ? { blockReason: t.blockReason } : {}),
           },
         }),
       ),
@@ -116,6 +119,13 @@ export class PrismaTargetRepository implements TargetRepository {
     await this.client.target.update({
       where: { id },
       data: { status, ...(patch ?? {}) },
+    });
+  }
+
+  async block(id: string, reason: string): Promise<void> {
+    await this.client.target.update({
+      where: { id },
+      data: { status: "BLOCKED", blockReason: reason },
     });
   }
 

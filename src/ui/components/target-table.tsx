@@ -66,6 +66,15 @@ export function TargetTable({ targets }: TargetTableProps) {
             <TableCell className="max-w-[140px] truncate">{target.companyName ?? "—"}</TableCell>
             <TableCell className="max-w-[280px] align-top">
               <RunStatusBadge status={target.status} />
+              {/* NGリストで弾いたものはRunが無く、直近Runの失敗理由では説明できないため個別に出す。 */}
+              {target.blockReason && (
+                <p
+                  className="mt-1 line-clamp-2 whitespace-normal text-xs text-muted-foreground"
+                  title={target.blockReason}
+                >
+                  {target.blockReason}
+                </p>
+              )}
               {FAILED_LIKE_STATUSES.has(target.status) && target.latestErrorStep && (
                 <p
                   className="mt-1 line-clamp-2 whitespace-normal text-xs text-muted-foreground"

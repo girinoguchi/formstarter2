@@ -1,6 +1,6 @@
 "use client";
 
-import { List, LogOut, Mail } from "lucide-react";
+import { Ban, List, LogOut, Mail } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -15,6 +15,7 @@ interface NavItem {
 const NAV_ITEMS: readonly NavItem[] = [
   { href: "/profile", label: "送信内容設定", icon: Mail },
   { href: "/targets", label: "リスト設定・送信実行", icon: List },
+  { href: "/ng-list", label: "NGリスト", icon: Ban },
 ];
 
 export function Sidebar({ username }: { username: string }) {
