@@ -17,6 +17,8 @@ import { PlaywrightFormFiller } from "../infrastructure/form/form-filler";
 import { HeuristicSentPageDetector } from "../infrastructure/form/sent-page-detector";
 import { DomValidationErrorParser } from "../infrastructure/form/validation-error-parser";
 import { RuleBasedFieldClassifier } from "../infrastructure/llm/rule-based-classifier";
+import { ListSearchService } from "../application/list-search";
+import { SerperWebSearch } from "../infrastructure/search/serper-web-search";
 import { PrismaNgEntryRepository } from "../infrastructure/persistence/prisma-ng-entry-repository";
 import { PrismaProfileRepository } from "../infrastructure/persistence/prisma-profile-repository";
 import { PrismaRunRepository } from "../infrastructure/persistence/prisma-run-repository";
@@ -30,6 +32,10 @@ import { prisma } from "./prisma";
 
 const targetRepository = new PrismaTargetRepository(prisma);
 const ngEntryRepository = new PrismaNgEntryRepository(prisma);
+// APIキーが無い環境ではnullのまま。呼び出し側（API route）が503で案内する。
+const listSearchService = env.SERPER_API_KEY
+  ? new ListSearchService(new SerperWebSearch(env.SERPER_API_KEY))
+  : null;
 const csvImportService = new CsvImportService(targetRepository, ngEntryRepository);
 const profileRepository = new PrismaProfileRepository(prisma);
 const runRepository = new PrismaRunRepository(prisma);
@@ -110,4 +116,9 @@ export function getUserRepository() {
 
 export function getNgEntryRepository() {
   return ngEntryRepository;
+}
+
+/** SERPER_API_KEYが未設定ならnull。 */
+export function getListSearchService() {
+  return listSearchService;
 }

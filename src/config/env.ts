@@ -13,6 +13,9 @@ const envSchema = z.object({
   // セッションCookieのSecure属性判定に使う（FormStarterappと同じ方式）。httpsでない
   // 環境でSecureを付けるとブラウザがCookie自体を保存せずログインループになるため。
   NEXT_PUBLIC_APP_URL: z.string().optional(),
+  // リスト検索（Serper.dev経由のGoogle検索）のAPIキー。この機能を使わない環境でも
+  // アプリ全体が起動できるよう任意にし、未設定ならAPI側で503を返す。
+  SERPER_API_KEY: z.string().optional(),
 });
 
 export const env = envSchema.parse({
@@ -21,4 +24,5 @@ export const env = envSchema.parse({
   EXPLORE_CONCURRENCY: process.env.EXPLORE_CONCURRENCY,
   AUTH_SECRET: process.env.AUTH_SECRET,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  SERPER_API_KEY: process.env.SERPER_API_KEY,
 });
