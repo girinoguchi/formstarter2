@@ -13,11 +13,13 @@ import type { ContactPageFinder } from "../domain/ports/contact-page-finder.port
 import type { FieldClassifier } from "../domain/ports/field-classifier.port";
 import type { FieldFillFailure, FormFiller } from "../domain/ports/form-filler.port";
 import type { FormParser } from "../domain/ports/form-parser.port";
+import type { NgEntryRepository } from "../domain/ports/ng-entry-repository.port";
 import type { ProfileRepository } from "../domain/ports/profile-repository.port";
 import type { RunRepository } from "../domain/ports/run-repository.port";
 import type { ScreenshotService } from "../domain/ports/screenshot-service.port";
 import type { TargetRepository } from "../domain/ports/target-repository.port";
 import type { ValidationErrorParser } from "../domain/ports/validation-error-parser.port";
+import { isNgUrl, NG_BLOCK_REASON } from "../domain/value-objects/ng-match";
 import { CONTEXT_KEPT_OPEN_RUN_STATUSES, type RunStatus } from "../domain/value-objects/run-status";
 import { CONTACT_PAGE_CONFIDENCE_THRESHOLD } from "../config/constants";
 import type { StaticFormChecker } from "../domain/ports/static-form-checker.port";
@@ -73,6 +75,7 @@ export class RunOrchestrator {
     private readonly fieldClassifier: FieldClassifier,
     private readonly formFiller: FormFiller,
     private readonly profileRepository: ProfileRepository,
+    private readonly ngEntryRepository: NgEntryRepository,
     private readonly validationErrorParser: ValidationErrorParser,
     private readonly confirmationPageDetector: ConfirmationPageDetector,
     private readonly sentPageDetector: SentPageDetector,
@@ -179,6 +182,19 @@ export class RunOrchestrator {
   private async startRun(targetId: string, kind: RunKind): Promise<{ target: Target; run: Run }> {
     const target = await this.targetRepository.findById(targetId);
     if (!target) throw new Error(`Target not found: ${targetId}`);
+
+    // NGリストの安全網。取り込み時点では未登録で、その後NGに追加されたターゲットが
+    // 残っている場合に開いてしまわないよう、実行の直前にもう一度照合する
+    // （取り込み時のチェックだけでは、取り込み後の追加を防げない）。
+    const ngValues = await this.ngEntryRepository.listValues(target.ownerId);
+    if (
+      isNgUrl(target.url, ngValues) ||
+      (target.contactPageUrl && isNgUrl(target.contactPageUrl, ngValues))
+    ) {
+      await this.targetRepository.block(targetId, NG_BLOCK_REASON);
+      throw new Error(`Target ${targetId} is on the NG list`);
+    }
+
     if (kind === "FILL" && !target.contactPageUrl) {
       throw new Error(`Target ${targetId} is not READY yet (探索が完了していません)`);
     }
@@ -549,6 +565,21 @@ export class RunOrchestrator {
       "静的探索（ブラウザ不使用）で問い合わせフォームを探しています",
     );
 
+    // 1. 与えられたURL自体がフォームページであるケースを最初に見る。
+    //    リストには「https://example.co.jp/contact」のように問い合わせページが直接
+    //    登録されることが多い。リンク探索はそのページ「から」の遷移先を探す作りで、
+    //    自己参照リンクは候補から除外しているため、この形は取りこぼしていた
+    //    （robe-japonica.jp / ipi.co.jp/contact / moasis.jp/contact.aspx で確認）。
+    if (await this.staticFormChecker.hasFillableForm(target.url)) {
+      await this.runRepository.appendLog(
+        run.id,
+        "INFO",
+        "STATIC_PROBE_SUCCESS",
+        `指定URL自体にフォームを検出しました: ${target.url}`,
+      );
+      return { ok: true, contactPageUrl: target.url };
+    }
+
     const httpResult = await this.httpContactPageFinder
       .findContactPage(target.url)
       .catch(() => ({ contactPageUrl: null, confidence: 0 }));
@@ -563,6 +594,25 @@ export class RunOrchestrator {
           `静的探索でフォームを検出しました: ${httpResult.contactPageUrl}`,
         );
         return { ok: true, contactPageUrl: httpResult.contactPageUrl };
+      }
+
+      // 2. 問い合わせページにフォームが無い場合、そこが窓口の一覧である可能性を1階層だけ辿る
+      //    （kcs.ne.jp/inquiry → /inquiry/biz、antepost.co.jp/contact/ → /contact/inquiry）。
+      //    無制限に潜ると探索が重くなるため、深さ1・候補5件までに限る。
+      const deeper = await (this.httpContactPageFinder
+        .listContactLinks?.(httpResult.contactPageUrl)
+        .catch(() => [] as readonly string[]) ?? Promise.resolve([] as readonly string[]));
+
+      for (const candidate of deeper) {
+        if (await this.staticFormChecker.hasFillableForm(candidate)) {
+          await this.runRepository.appendLog(
+            run.id,
+            "INFO",
+            "STATIC_PROBE_SUCCESS",
+            `問い合わせ一覧の先でフォームを検出しました: ${candidate}`,
+          );
+          return { ok: true, contactPageUrl: candidate };
+        }
       }
     }
 

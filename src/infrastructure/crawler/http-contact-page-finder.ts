@@ -6,6 +6,15 @@ import { isSameSite, isSelfLink } from "./same-site";
 
 type Landmark = "header" | "nav" | "footer" | "other";
 
+// 一覧ページから「その先のフォーム」を探すとき用の重み付け。通常の探索(LANDMARK_SCORE)とは
+// 優先順位が逆になる——詳細はlistContactLinks内のコメントを参照。
+const DEEPER_LINK_SCORE: Record<Landmark, number> = {
+  other: 1,
+  footer: 0.6,
+  header: 0.4,
+  nav: 0.4,
+};
+
 const LANDMARK_SCORE: Record<Landmark, number> = {
   header: 1,
   nav: 1,
@@ -24,6 +33,59 @@ function matchesKeyword(text: string): boolean {
  * キーワードスコアリングし、見つからなければ sitemap.xml もあたる。
  */
 export class HttpContactPageFinder implements ContactPageFinder {
+  /**
+   * 問い合わせ系リンクをスコア順に列挙する。
+   *
+   * 「お問い合わせ」ページが窓口の一覧（法人向け/採用/個人情報など）になっていて、
+   * フォーム自体は1階層下にある構成が実データで複数見つかったため、その深追いに使う
+   * （例: kcs.ne.jp/inquiry → /inquiry/biz、antepost.co.jp/contact/ → /contact/inquiry）。
+   */
+  async listContactLinks(pageUrl: string, limit = 5): Promise<readonly string[]> {
+    let html: string;
+    try {
+      const res = await fetch(pageUrl, { redirect: "follow" });
+      if (!res.ok) return [];
+      html = await res.text();
+    } catch {
+      return [];
+    }
+
+    const $ = cheerio.load(html);
+    const scored: { url: string; score: number }[] = [];
+    const seen = new Set<string>();
+
+    $("a[href]").each((_, el) => {
+      const $el = $(el);
+      const href = $el.attr("href");
+      if (!href || href.startsWith("mailto:") || href.startsWith("tel:")) return;
+      if (!matchesKeyword($el.text()) && !matchesKeyword(href)) return;
+
+      let location: Landmark = "other";
+      if ($el.closest("header").length > 0) location = "header";
+      else if ($el.closest("nav").length > 0) location = "nav";
+      else if ($el.closest("footer").length > 0) location = "footer";
+
+      try {
+        const resolved = new URL(href, pageUrl).toString();
+        if (!isSameSite(resolved, pageUrl)) return;
+        if (isSelfLink(resolved, pageUrl)) return;
+        if (seen.has(resolved)) return;
+        seen.add(resolved);
+        // 一覧ページ本文に並ぶ窓口リンクを拾いたいので、findContactPageとは逆に
+        // header/navよりも本文("other")を優先する。header/navの「お問い合わせ」は
+        // 今まさに見ている一覧ページ自身や、その入口を指していることが多い。
+        scored.push({ url: resolved, score: DEEPER_LINK_SCORE[location] });
+      } catch {
+        // 不正なURLは無視
+      }
+    });
+
+    return scored
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map((c) => c.url);
+  }
+
   async findContactPage(siteUrl: string): Promise<ContactPageFinderResult> {
     let html: string;
     try {
